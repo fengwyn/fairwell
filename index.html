@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAIRWELL</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="artic.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-toolbar">
+    <button class="toolbar-btn" onclick="handleLoadJson()">Load Data</button>
+    <button class="toolbar-btn" onclick="handleExport()">Export Data</button>
+    <button class="toolbar-btn" onclick="handleReset()">Reset to Defaults</button>
+  </div>
+  <h1>FAIR<strong>WELL</strong></h1>
+  <div class="subtitle"></div>
+  <div class="special-chars" id="specialCharsBar"></div>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showSection('relationships')">Document Map</button>
+  <button class="nav-btn" onclick="showSection('hierarchy')">Hierarchy</button>
+  <button class="nav-btn" onclick="showSection('decision')">Decision Flow</button>
+  <button class="nav-btn" onclick="showSection('forms')">Interactive Forms</button>
+  <button class="nav-btn" onclick="showSection('review')">Generate Turnbacks</button>
+  <button class="nav-btn" onclick="showSection('certtrace')">Trace</button>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">&#9790;</button>
+</nav>
+
+<!-- SECTION 1: Document Relationships (rendered dynamically) -->
+<div id="relationships" class="section active">
+  <div class="section-header">
+    <h2 class="section-title">Document Relationship Map</h2>
+    <button class="add-doc-btn" onclick="openDocModal(-1)">+ Add Document</button>
+  </div>
+  <p class="section-desc">Documents that govern the FAIR process. Each has a distinct role, and they cross-reference each other extensively.</p>
+  <div id="docGrid" class="doc-grid"></div>
+</div>
+
+<!-- SECTION 2: Hierarchy (rendered dynamically) -->
+<div id="hierarchy" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Document Hierarchy</h2>
+    <button class="add-doc-btn" onclick="openHierLevelModal()">+ Add Level</button>
+  </div>
+  <p class="section-desc">COL-ASQR-PRO-0003 is the enterprise foundation. HSM17 and HSM19 supplement it for P&amp;C. HSM236 operationalizes all of them into the AS9102 FAI forms.</p>
+  <div class="hierarchy" id="hierarchyContainer"></div>
+</div>
+
+<!-- SECTION 3: Decision Flow (rendered dynamically) -->
+<div id="decision" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Decision Flow</h2>
+    <button class="add-doc-btn" onclick="openStepModal(-1)">+ Add Step</button>
+  </div>
+  <p class="section-desc">Use this flow when reviewing a FAIR to determine which document to consult for specific questions.</p>
+  <div class="decision-flow" id="decisionFlowContainer"></div>
+</div>
+
+<!-- SECTION 4: Interactive Forms -->
+<div id="forms" class="section">
+  <h2 class="section-title">Interactive FAI Forms</h2>
+  <p class="section-desc">Click any field to see which documents govern it, what to check, and related turnback codes.</p>
+
+  <div class="legend" id="legendContainer"></div>
+
+  <div class="form-tabs">
+    <button class="form-tab active" onclick="showForm('form1')">Form 1</button>
+    <button class="form-tab" onclick="showForm('form2')">Form 2</button>
+    <button class="form-tab" onclick="showForm('form3')">Form 3</button>
+  </div>
+
+  <div id="form1" class="form-container active">
+    <div class="form-grid f1-grid" id="f1grid"></div>
+  </div>
+  <div id="form2" class="form-container">
+    <div class="form-grid f2-grid" id="f2grid"></div>
+  </div>
+  <div id="form3" class="form-container">
+    <div class="form-grid f3-grid" id="f3grid"></div>
+  </div>
+</div>
+
+<!-- SECTION 5: Generate Turnback(s) (batch turnback composer) -->
+<div id="review" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Generate Turnbacks</h2>
+    <button class="add-doc-btn" id="revAddTbBtn">+ Add Turnback</button>
+    <button class="toolbar-btn" id="revManageRefsBtn">Manage References</button>
+  </div>
+  <p class="section-desc">Pre-built templates for issuing batch turnbacks. Browse the curated library, fill in placeholder specifics, stack findings, and export a tab-separated block ready to paste into the Findings template. The library is empty by default — add turnbacks manually or use <strong>Load Data</strong> to import a data.json file.</p>
+
+  <div class="review-meta">
+    <div class="review-meta-field"><label>FAIR ID</label><input class="modal-input" id="revMetaFairId" placeholder="A23-V1.0"></div>
+    <div class="review-meta-field"><label>Part No.</label><input class="modal-input" id="revMetaPart" placeholder="123456-001"></div>
+    <div class="review-meta-field"><label>Supplier Code</label><input class="modal-input" id="revMetaSupCode" placeholder="SUP-4821"></div>
+    <div class="review-meta-field"><label>Supplier</label><input class="modal-input" id="revMetaSupName" placeholder="Supplier LLC"></div>
+    <div class="review-meta-field"><label>Entered By</label><input class="modal-input" id="revMetaEnteredBy" placeholder="John Fair"></div>
+  </div>
+
+  <div class="review-layout">
+    <!-- Library pane -->
+    <section class="review-pane">
+      <header class="review-pane-head">
+        <span class="review-pane-title">Turnback Library</span>
+        <span class="review-pane-count" id="revLibCount"></span>
+      </header>
+      <div class="review-filters">
+        <input type="text" class="modal-input" id="revSearch" placeholder="Search by id, title, block, keyword...">
+        <div class="review-filter-group">
+          <div class="review-filter-label">Document</div>
+          <div class="review-chipset" id="revDocChips"></div>
+        </div>
+        <div class="review-filter-group">
+          <div class="review-filter-label">Severity</div>
+          <div class="review-chipset" id="revSevChips"></div>
+        </div>
+        <div class="review-filter-group">
+          <div class="review-filter-label">Filter</div>
+          <div class="review-chipset" id="revProgramChips"></div>
+        </div>
+      </div>
+      <div class="review-list" id="revList"></div>
+    </section>
+
+    <!-- Composer pane -->
+    <section class="review-pane">
+      <header class="review-pane-head">
+        <span class="review-pane-title">Finding Composer</span>
+        <span class="review-pane-count" id="revComposerTag"></span>
+      </header>
+      <div class="review-composer" id="revComposer"></div>
+    </section>
+
+    <!-- Basket pane -->
+    <section class="review-pane">
+      <header class="review-pane-head">
+        <span class="review-pane-title">Findings</span>
+        <span class="review-pane-count review-basket-count" id="revBasketCount">00</span>
+      </header>
+      <div class="review-basket-tabs">
+        <button class="review-tab active" id="revTabList" onclick="revSetPanelView('list')">List</button>
+        <button class="review-tab" id="revTabExport" onclick="revSetPanelView('export')">Export</button>
+      </div>
+      <div class="review-basket" id="revBasket"></div>
+    </section>
+  </div>
+</div>
+
+<!-- SECTION 6: Item Tracer (PDF cross-reference) -->
+<div id="certtrace" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Trace</h2>
+    <button class="toolbar-btn" id="certClearBtn">Clear All</button>
+  </div>
+  <p class="section-desc">Drop in PDFs (Form 1/2/3, PO, CoC, drawings, raw-material certs) and trace any part number, serial number, heat/lot, or spec across all of them. Files never leave your browser — they're parsed client-side with PDF.js.</p>
+
+  <div class="cert-controls">
+    <div class="cert-dropzone" id="certDropZone">
+      <input type="file" id="certFileInput" accept="application/pdf,.pdf" multiple hidden>
+      <div class="cert-dropzone-inner">
+        <div class="cert-dropzone-icon">+</div>
+        <div class="cert-dropzone-text">
+          <strong>Drop PDFs here</strong>
+          <span class="cert-dropzone-hint">or <button type="button" class="cert-dropzone-browse" id="certBrowseBtn">browse…</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cert-search">
+      <div class="cert-field">
+        <label>Subject to trace</label>
+        <input type="text" class="modal-input" id="certTermInput" placeholder="e.g. A123-4567, SN0001, Heat 78234, Rev N/C">
+      </div>
+      <div class="cert-search-options">
+        <label class="review-check"><input type="checkbox" id="certCaseSensitive"> Case sensitive</label>
+        <label class="review-check" title="Treat O↔0 and I↔1 as equivalent — useful for OCR-style part numbers"><input type="checkbox" id="certLooseNumeric"> Loose numeric</label>
+      </div>
+      <button class="add-doc-btn review-btn-primary" id="certRunBtn">Trace →</button>
+    </div>
+  </div>
+
+  <div class="cert-layout">
+    <section class="cert-pane cert-pane-docs">
+      <header class="cert-pane-head">
+        <span class="cert-pane-title">Documents</span>
+        <span class="cert-pane-count" id="certDocsCount">0</span>
+      </header>
+      <div class="cert-docs-list" id="certDocsList"></div>
+    </section>
+
+    <section class="cert-pane cert-pane-graph">
+      <header class="cert-pane-head">
+        <span class="cert-pane-title">Link Graph</span>
+        <span class="cert-pane-count" id="certVerdictTag"></span>
+      </header>
+      <div class="cert-graph" id="certGraph"></div>
+    </section>
+  </div>
+
+  <section class="cert-results-pane">
+    <header class="cert-pane-head">
+      <span class="cert-pane-title">Hits</span>
+    </header>
+    <div class="cert-results" id="certResults"></div>
+  </section>
+</div>
+
+<!-- Side Panel -->
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="info-panel" id="infoPanel">
+  <button class="panel-close" onclick="closePanel()">&times;</button>
+  <div id="panelContent"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="modal-cancel-btn" onclick="closeModal()">Cancel</button>
+      <button class="modal-save-btn" id="modalSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <span class="footer-igloo" aria-hidden="true" title="Fairwell">
+    <svg width="34" height="22" viewBox="0 0 34 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 20 Q2 3 17 3 Q32 3 32 20" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <path d="M4 11 Q17 8 30 11" stroke="currentColor" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+      <path d="M3 16 Q17 13.5 31 16" stroke="currentColor" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+      <line x1="9" y1="10" x2="9" y2="12.2" stroke="currentColor" stroke-width="0.9"/>
+      <line x1="17" y1="8.4" x2="17" y2="10.7" stroke="currentColor" stroke-width="0.9"/>
+      <line x1="25" y1="10" x2="25" y2="12.2" stroke="currentColor" stroke-width="0.9"/>
+      <line x1="6" y1="14.8" x2="6" y2="17.2" stroke="currentColor" stroke-width="0.9"/>
+      <line x1="13" y1="13.7" x2="13" y2="16.1" stroke="currentColor" stroke-width="0.9"/>
+      <line x1="21" y1="13.7" x2="21" y2="16.1" stroke="currentColor" stroke-width="0.9"/>
+      <line x1="28" y1="14.8" x2="28" y2="17.2" stroke="currentColor" stroke-width="0.9"/>
+      <path d="M13 20 Q13 14.5 17 14.5 Q21 14.5 21 20" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+    </svg>
+  </span>
+  <a href="LICENSE" class="footer-license" target="_blank" rel="noopener">License</a>
+</footer>
+
+<script src="data.js"></script>
+<script src="scripts.js"></script>
+<script src="reviewMode.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="certTrace.js"></script>
+</body>
+</html>

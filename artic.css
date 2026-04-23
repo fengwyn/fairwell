@@ -1,0 +1,391 @@
+/* ══════════════════════════════════════════════════════════
+   ARTIC — Light mode theme
+   White, blues, and penguins.
+   Activated when <body> has class "light-mode".
+   ══════════════════════════════════════════════════════════ */
+
+body.light-mode {
+  /* Core palette — icy whites and arctic blues */
+  --bg-primary: #f0f4f8;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #e8f0fe;
+  --border: #c8d6e5;
+  --border-glow: #2e86de;
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a5568;
+  --text-muted: #7e8a9a;
+
+  /* Accents — kept vibrant for contrast on light */
+  --accent-blue: #2e86de;
+  --accent-cyan: #0891b2;
+  --accent-emerald: #059669;
+  --accent-amber: #d97706;
+  --accent-rose: #dc2626;
+  --accent-purple: #7c3aed;
+  --accent-orange: #ea580c;
+
+  /* Document colors are injected dynamically by applyCustomColors() */
+}
+
+/* ── Hero — sky gradient + blueprint grid on hover ── */
+body.light-mode .hero {
+  background:
+    radial-gradient(ellipse at 25% 25%, rgba(125,211,252,0.55) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(186,230,253,0.45) 0%, transparent 55%),
+    linear-gradient(180deg, #b6d7ff 0%, #d7ebff 45%, #f0f9ff 100%);
+  border-bottom-color: var(--border);
+}
+body.light-mode .hero::before {
+  background-image:
+    linear-gradient(to right,  rgba(30,58,95,0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30,58,95,0.22) 1px, transparent 1px),
+    linear-gradient(to right,  rgba(30,58,95,0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30,58,95,0.09) 1px, transparent 1px);
+}
+body.light-mode .hero h1 {
+  color: #1e3a5f;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  filter: drop-shadow(0 1px 6px rgba(30,58,95,0.15));
+}
+body.light-mode .hero h1 strong {
+  background: linear-gradient(180deg, #0a2f5e 0%, #1e3a5f 55%, #2e86de 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+body.light-mode .hero h1::before {
+  border-left-color: #1d4ed8;
+  border-top-color: #1d4ed8;
+}
+body.light-mode .hero h1::after {
+  background: linear-gradient(90deg, #1d4ed8 0%, rgba(29,78,216,0.55) 55%, transparent 100%);
+}
+body.light-mode .hero .subtitle {
+  color: #4a6a92;
+}
+
+/* ── Penguin decoration on hero ── */
+body.light-mode .hero::after {
+  content: '\1F427';
+  position: absolute;
+  bottom: 12px;
+  right: 40px;
+  font-size: 2rem;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+/* ── Nav ── */
+body.light-mode .nav {
+  background: #ffffff;
+  border-bottom-color: var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+body.light-mode .nav-btn {
+  color: #4a5568;
+}
+body.light-mode .nav-btn:hover {
+  background: #edf2f7;
+  color: #1a1a2e;
+}
+body.light-mode .nav-btn.active {
+  background: #edf2f7;
+  color: var(--accent-blue);
+  border-color: var(--border);
+  box-shadow: 0 0 8px rgba(46,134,222,0.12);
+}
+
+/* ── Cards ── */
+body.light-mode .doc-card {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+body.light-mode .doc-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+/* Doc badge colors now use --card-color from inline styles (works for any color) */
+
+body.light-mode .doc-title-link {
+  color: #1a1a2e;
+}
+body.light-mode .doc-title-link:hover {
+  color: var(--accent-blue);
+}
+body.light-mode .doc-link {
+  background: #f7fafc;
+  border-color: #d1dce8;
+  color: #4a5568;
+}
+body.light-mode .doc-link:hover {
+  background: #edf2f7;
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* ── Icon buttons ── */
+body.light-mode .icon-btn {
+  background: #f7fafc;
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .icon-btn:hover {
+  background: #edf2f7;
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+body.light-mode .icon-btn.delete-btn:hover {
+  color: var(--accent-rose);
+  border-color: var(--accent-rose);
+}
+body.light-mode .icon-btn-sm {
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .icon-btn-sm:hover {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+/* ── Toolbar & add buttons ── */
+body.light-mode .add-doc-btn,
+body.light-mode .toolbar-btn {
+  background: #ffffff;
+  border-color: #d1dce8;
+  color: #4a5568;
+}
+body.light-mode .add-doc-btn:hover {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+body.light-mode .toolbar-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* ── Hierarchy ── */
+body.light-mode .hier-card {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+body.light-mode .hier-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+body.light-mode .hier-card.foundation {
+  box-shadow: 0 0 16px rgba(124,58,237,0.1);
+}
+body.light-mode .connector-line {
+  background: #b0c4d8;
+}
+body.light-mode .connector-line::after {
+  color: #7e8a9a;
+}
+body.light-mode .hierarchy-branch::before {
+  background: #b0c4d8;
+}
+body.light-mode .hier-add-card-btn {
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .hier-add-card-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(46,134,222,0.08);
+}
+
+/* ── Decision flow ── */
+body.light-mode .flow-step {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+body.light-mode .flow-step:hover {
+  border-color: rgba(46,134,222,0.3);
+}
+body.light-mode .flow-answer {
+  background: #f7fafc;
+  border-color: #d1dce8;
+}
+body.light-mode .flow-answer.yes {
+  background: rgba(5, 150, 105, 0.09);
+  border-color: rgba(5, 150, 105, 0.4);
+}
+body.light-mode .flow-answer.yes .ans-label { color: #047857; }
+body.light-mode .flow-answer.no {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+body.light-mode .flow-answer.no .ans-label { color: #b91c1c; }
+body.light-mode .flow-answer.ref {
+  background: rgba(217, 119, 6, 0.09);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+body.light-mode .flow-answer.ref .ans-label { color: #b45309; }
+body.light-mode .flow-answer.always {
+  background: rgba(46, 134, 222, 0.08);
+  border-color: rgba(46, 134, 222, 0.4);
+}
+body.light-mode .flow-answer.always .ans-label { color: #1d4ed8; }
+body.light-mode .flow-connector-v .vline {
+  background: #b0c4d8;
+}
+body.light-mode .flow-add-ans-btn {
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .flow-add-ans-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(46,134,222,0.06);
+}
+
+/* ── Form grid ── */
+body.light-mode .form-grid {
+  background: #d1dce8;
+  border-color: #d1dce8;
+}
+body.light-mode .form-cell:hover {
+  background: #e8f0fe;
+}
+body.light-mode .form-tab {
+  background: #ffffff;
+  border-color: #d1dce8;
+  color: #4a5568;
+}
+body.light-mode .form-tab:hover {
+  color: #1a1a2e;
+}
+body.light-mode .form-tab.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+/* ── Legend ── */
+body.light-mode .legend {
+  background: #ffffff;
+  border-color: #d1dce8;
+}
+body.light-mode .legend-add-btn {
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .legend-add-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(46,134,222,0.08);
+}
+body.light-mode .modal-color-input {
+  border-color: #d1dce8;
+  background: #f7fafc;
+}
+
+/* ── Side panel ── */
+body.light-mode .info-panel {
+  background: #ffffff;
+  border-left-color: #d1dce8;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+}
+body.light-mode .panel-close {
+  background: #f7fafc;
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .panel-close:hover {
+  background: var(--accent-rose);
+  color: white;
+}
+body.light-mode .panel-ref {
+  background: #f7fafc;
+  border-color: #d1dce8;
+}
+body.light-mode .panel-turnback {
+  background: rgba(220,38,38,0.05);
+  border-color: rgba(220,38,38,0.15);
+}
+body.light-mode .panel-add-btn {
+  border-color: #d1dce8;
+  color: var(--accent-blue);
+}
+body.light-mode .panel-add-btn:hover {
+  background: var(--accent-blue);
+  color: white;
+}
+
+/* ── Overlay ── */
+body.light-mode .overlay {
+  background: rgba(0,0,0,0.25);
+}
+
+/* ── Modal ── */
+body.light-mode .modal {
+  background: #ffffff;
+  border-color: #d1dce8;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+}
+body.light-mode .modal-header {
+  border-bottom-color: #e2e8f0;
+}
+body.light-mode .modal-footer {
+  border-top-color: #e2e8f0;
+}
+body.light-mode .modal-close-btn {
+  background: #f7fafc;
+  border-color: #d1dce8;
+  color: #7e8a9a;
+}
+body.light-mode .modal-close-btn:hover {
+  background: var(--accent-rose);
+  color: white;
+}
+body.light-mode .modal-input {
+  background: #f7fafc;
+  border-color: #d1dce8;
+  color: #1a1a2e;
+}
+body.light-mode .modal-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(46,134,222,0.15);
+}
+body.light-mode .modal-cancel-btn {
+  border-color: #d1dce8;
+  color: #4a5568;
+}
+body.light-mode .modal-cancel-btn:hover {
+  color: #1a1a2e;
+  border-color: #7e8a9a;
+}
+
+/* ── Scrollbar (light) ── */
+body.light-mode::-webkit-scrollbar-track { background: #f0f4f8; }
+body.light-mode::-webkit-scrollbar-thumb { background: #b0c4d8; }
+body.light-mode::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+/* ── Theme toggle button ── */
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+  margin-left: auto;
+  padding: 0;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+}
+
+/* Penguin accent on section titles in light mode */
+body.light-mode .section-title::after {
+  content: ' \1F427';
+  font-size: 0.6em;
+  opacity: 0.25;
+}
