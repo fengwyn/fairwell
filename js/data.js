@@ -69,7 +69,8 @@ const SEED_DATA = {
   form3Fields: [],
   specialChars: JSON.parse(JSON.stringify(SEED_SPECIAL_CHARS)),
   reviewTurnbacks: [],
-  reviewRefMeta: {}
+  reviewRefMeta: {},
+  descriptions: {}
 };
 
 // --------------- persistence helpers ---------------
@@ -93,6 +94,7 @@ function loadData() {
       if (!data.specialChars) data.specialChars = JSON.parse(JSON.stringify(SEED_SPECIAL_CHARS));
       if (!Array.isArray(data.reviewTurnbacks)) data.reviewTurnbacks = [];
       if (!data.reviewRefMeta || typeof data.reviewRefMeta !== 'object') data.reviewRefMeta = {};
+      if (!data.descriptions || typeof data.descriptions !== 'object') data.descriptions = {};
       backfillDocTypes(data);
       return data;
     }

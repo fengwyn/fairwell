@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FAIRWELL</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="artic.css">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/artic.css">
 </head>
 <body>
 
@@ -37,7 +37,7 @@
     <h2 class="section-title">Document Relationship Map</h2>
     <button class="add-doc-btn" onclick="openDocModal(-1)">+ Add Document</button>
   </div>
-  <p class="section-desc">Documents that govern the FAIR process. Each has a distinct role, and they cross-reference each other extensively.</p>
+  <p class="section-desc" data-section-desc="relationships">Documents that govern the FAIR process. Each has a distinct role, and they cross-reference each other extensively.</p>
   <div id="docGrid" class="doc-grid"></div>
 </div>
 
@@ -47,7 +47,7 @@
     <h2 class="section-title">Document Hierarchy</h2>
     <button class="add-doc-btn" onclick="openHierLevelModal()">+ Add Level</button>
   </div>
-  <p class="section-desc">COL-ASQR-PRO-0003 is the enterprise foundation. HSM17 and HSM19 supplement it for P&amp;C. HSM236 operationalizes all of them into the AS9102 FAI forms.</p>
+  <p class="section-desc" data-section-desc="hierarchy">COL-ASQR-PRO-0003 is the enterprise foundation. HSM17 and HSM19 supplement it for P&amp;C. HSM236 operationalizes all of them into the AS9102 FAI forms.</p>
   <div class="hierarchy" id="hierarchyContainer"></div>
 </div>
 
@@ -57,14 +57,14 @@
     <h2 class="section-title">Decision Flow</h2>
     <button class="add-doc-btn" onclick="openStepModal(-1)">+ Add Step</button>
   </div>
-  <p class="section-desc">Use this flow when reviewing a FAIR to determine which document to consult for specific questions.</p>
+  <p class="section-desc" data-section-desc="decision">Use this flow when reviewing a FAIR to determine which document to consult for specific questions.</p>
   <div class="decision-flow" id="decisionFlowContainer"></div>
 </div>
 
 <!-- SECTION 4: Interactive Forms -->
 <div id="forms" class="section">
   <h2 class="section-title">Interactive FAI Forms</h2>
-  <p class="section-desc">Click any field to see which documents govern it, what to check, and related turnback codes.</p>
+  <p class="section-desc" data-section-desc="forms">Click any field to see which documents govern it, what to check, and related turnback codes.</p>
 
   <div class="legend" id="legendContainer"></div>
 
@@ -92,7 +92,7 @@
     <button class="add-doc-btn" id="revAddTbBtn">+ Add Turnback</button>
     <button class="toolbar-btn" id="revManageRefsBtn">Manage References</button>
   </div>
-  <p class="section-desc">Pre-built templates for issuing batch turnbacks. Browse the curated library, fill in placeholder specifics, stack findings, and export a tab-separated block ready to paste into the Findings template. The library is empty by default — add turnbacks manually or use <strong>Load Data</strong> to import a data.json file.</p>
+  <p class="section-desc" data-section-desc="review">Pre-built templates for issuing batch turnbacks. Browse the curated library, fill in placeholder specifics, stack findings, and export a tab-separated block ready to paste into the Findings template. The library is empty by default. Add turnbacks manually or use <strong>Load Data</strong> to import a data.json file.</p>
 
   <div class="review-meta">
     <div class="review-meta-field"><label>FAIR ID</label><input class="modal-input" id="revMetaFairId" placeholder="A23-V1.0"></div>
@@ -157,7 +157,7 @@
     <h2 class="section-title">Trace</h2>
     <button class="toolbar-btn" id="certClearBtn">Clear All</button>
   </div>
-  <p class="section-desc">Drop in PDFs (Form 1/2/3, PO, CoC, drawings, raw-material certs) and trace any part number, serial number, heat/lot, or spec across all of them. Files never leave your browser — they're parsed client-side with PDF.js.</p>
+  <p class="section-desc" data-section-desc="certtrace">Drop in PDFs (Form 1/2/3, PO, CoC, drawings, raw-material certs) and trace any part number, serial number, heat/lot, or spec across all of them. Files never leave your browser, they're parsed client-side with PDF.js.</p>
 
   <div class="cert-controls">
     <div class="cert-dropzone" id="certDropZone">
@@ -248,13 +248,14 @@
       <path d="M13 20 Q13 14.5 17 14.5 Q21 14.5 21 20" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/>
     </svg>
   </span>
+  <a href="README.md" class="footer-license" target="_blank" rel="noopener">README</a>
   <a href="LICENSE" class="footer-license" target="_blank" rel="noopener">License</a>
 </footer>
 
-<script src="data.js"></script>
-<script src="scripts.js"></script>
-<script src="reviewMode.js"></script>
+<script src="js/data.js"></script>
+<script src="js/scripts.js"></script>
+<script src="js/reviewMode.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="certTrace.js"></script>
+<script src="js/certTrace.js"></script>
 </body>
 </html>

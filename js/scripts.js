@@ -1161,6 +1161,7 @@ function applyImportedData(imported) {
   if (!imported.form3Fields) imported.form3Fields = [];
   if (!Array.isArray(imported.reviewTurnbacks)) imported.reviewTurnbacks = [];
   if (!imported.reviewRefMeta || typeof imported.reviewRefMeta !== 'object') imported.reviewRefMeta = {};
+  if (!Array.isArray(imported.specialChars)) imported.specialChars = JSON.parse(JSON.stringify(SEED_SPECIAL_CHARS));
   backfillDocTypes(imported);
   appData = imported;
   saveData(appData);
@@ -1265,6 +1266,7 @@ function renderAll() {
   applyCustomColors();
   renderLegend();
   renderSpecialChars();
+  renderSectionDescriptions();
   renderDocGrid();
   renderHierarchy();
   renderDecisionFlow();
@@ -1272,7 +1274,91 @@ function renderAll() {
   if (typeof renderReviewMode === 'function') renderReviewMode();
 }
 
+// ────────────────────────── Section Descriptions ──────────────────────────
+
+const SECTION_DESC_SEEDS = {};
+
+function captureSectionDescSeeds() {
+  document.querySelectorAll('.section-desc[data-section-desc]').forEach(el => {
+    const key = el.dataset.sectionDesc;
+    if (!(key in SECTION_DESC_SEEDS)) SECTION_DESC_SEEDS[key] = el.innerHTML;
+  });
+}
+
+function renderSectionDescriptions() {
+  if (!appData.descriptions) appData.descriptions = {};
+  document.querySelectorAll('.section-desc[data-section-desc]').forEach(el => {
+    if (el.classList.contains('editing')) return;
+    const key = el.dataset.sectionDesc;
+    const stored = appData.descriptions[key];
+    el.innerHTML = (stored != null && stored !== '')
+      ? esc(stored).replace(/\n/g, '<br>')
+      : (SECTION_DESC_SEEDS[key] || '');
+    if (!el.dataset.editBound) {
+      el.addEventListener('click', e => {
+        if (el.classList.contains('editing')) return;
+        if (e.target.closest('a')) return;
+        beginSectionDescEdit(el);
+      });
+      el.dataset.editBound = '1';
+    }
+    el.title = 'Click to edit';
+  });
+}
+
+function beginSectionDescEdit(el) {
+  const key = el.dataset.sectionDesc;
+  const stored = appData.descriptions && appData.descriptions[key];
+  const current = (stored != null && stored !== '')
+    ? stored
+    : sectionDescSeedAsText(key);
+  el.classList.add('editing');
+  el.innerHTML = `
+    <textarea class="modal-input modal-textarea section-desc-textarea"></textarea>
+    <div class="section-desc-edit-actions">
+      <button type="button" class="modal-cancel-btn section-desc-reset" title="Restore the built-in default for this section">Reset to default</button>
+      <span class="section-desc-edit-spacer"></span>
+      <button type="button" class="modal-cancel-btn section-desc-cancel">Cancel</button>
+      <button type="button" class="modal-save-btn section-desc-save">Save</button>
+    </div>
+  `;
+  const ta = el.querySelector('textarea');
+  ta.value = current;
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  el.querySelector('.section-desc-save').onclick = (e) => {
+    e.stopPropagation();
+    const next = ta.value.trim();
+    if (!appData.descriptions) appData.descriptions = {};
+    if (!next) delete appData.descriptions[key];
+    else appData.descriptions[key] = next;
+    saveData(appData);
+    el.classList.remove('editing');
+    renderSectionDescriptions();
+  };
+  el.querySelector('.section-desc-cancel').onclick = (e) => {
+    e.stopPropagation();
+    el.classList.remove('editing');
+    renderSectionDescriptions();
+  };
+  el.querySelector('.section-desc-reset').onclick = (e) => {
+    e.stopPropagation();
+    if (appData.descriptions) delete appData.descriptions[key];
+    saveData(appData);
+    el.classList.remove('editing');
+    renderSectionDescriptions();
+  };
+}
+
+function sectionDescSeedAsText(key) {
+  const html = SECTION_DESC_SEEDS[key] || '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || '').trim();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   restoreTheme();
+  captureSectionDescSeeds();
   renderAll();
 });
