@@ -66,14 +66,18 @@ body.light-mode .hero .subtitle {
   color: #4a6a92;
 }
 
-/* ── Penguin decoration on hero ── */
+/* ── Light-mode hero-corner watermark ── */
 body.light-mode .hero::after {
-  content: '\1F427';
+  content: '';
   position: absolute;
   bottom: 12px;
   right: 40px;
-  font-size: 2rem;
-  opacity: 0.18;
+  width: 48px;
+  height: 48px;
+  background-image: url('../favicon/apple-touch-icon.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.75;
   pointer-events: none;
 }
 
@@ -383,9 +387,3 @@ body.light-mode::-webkit-scrollbar-thumb:hover { background: var(--accent-blue);
   border-color: var(--accent-blue);
 }
 
-/* Penguin accent on section titles in light mode */
-body.light-mode .section-title::after {
-  content: ' \1F427';
-  font-size: 0.6em;
-  opacity: 0.25;
-}
