@@ -1,6 +1,6 @@
 # Commercial Licensing
 
-FAIRWELL is published under the [PolyForm Strict License 1.0.0](LICENSE). The license is deliberately narrow: it permits source review and the small set of permitted uses defined in the license text, and **does not grant rights to use FAIRWELL commercially, to modify it, or to redistribute it**.
+FAIRWELL is published under the [PolyForm Strict License 1.0.0](LICENSE). The license is deliberately narrow: it permits a small set of permitted uses defined in the license text, and **does not grant rights to use FAIRWELL commercially, to modify it, or to redistribute it**.
 
 If you need any of the following, a separate paid commercial license is required:
 
