@@ -1,6 +1,6 @@
 # FAIRWELL
 
-Fairwell (Version: Adelie 1)
+Fairwell (Version: Adelie 1.0)
 
 A lightweight, static front-end for documenting and navigating **First Article Inspection (FAI)** verification processes. FAIRWELL turns the web of governing documents, hierarchies, decision flows, and inspection forms into something you can click through instead of dig through PDFs for.
 

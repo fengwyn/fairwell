@@ -1901,6 +1901,87 @@ select.modal-input {
   align-items: center;
   color: var(--text-muted);
   opacity: 0.55;
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+}
+.footer-igloo:hover {
+  opacity: 1;
+  color: var(--text-secondary);
+}
+.footer-igloo:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+}
+
+.about-popover {
+  position: fixed;
+  left: 34px;
+  bottom: 58px;
+  z-index: 1000;
+  min-width: 220px;
+  padding: 14px 20px 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.38), 0 2px 6px rgba(0,0,0,0.22);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  animation: aboutPopIn 0.18s ease-out;
+}
+.about-popover[hidden] { display: none; }
+.about-popover::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: 18px;
+  width: 12px;
+  height: 12px;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+.about-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.about-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+.about-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-primary);
+  padding-right: 18px;
+}
+.about-title strong { font-weight: 900; }
+.about-version {
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+@keyframes aboutPopIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .footer-license {
   font-family: 'JetBrains Mono', monospace;

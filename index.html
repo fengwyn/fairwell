@@ -238,7 +238,7 @@
 </div>
 
 <footer class="site-footer">
-  <span class="footer-igloo" aria-hidden="true" title="Fairwell">
+  <button type="button" class="footer-igloo" id="footerIglooBtn" title="About Fairwell" aria-label="About Fairwell" aria-expanded="false" aria-controls="aboutPopover">
     <svg width="34" height="22" viewBox="0 0 34 22" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M2 20 Q2 3 17 3 Q32 3 32 20" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
       <path d="M4 11 Q17 8 30 11" stroke="currentColor" stroke-width="0.9" fill="none" stroke-linecap="round"/>
@@ -252,10 +252,16 @@
       <line x1="28" y1="14.8" x2="28" y2="17.2" stroke="currentColor" stroke-width="0.9"/>
       <path d="M13 20 Q13 14.5 17 14.5 Q21 14.5 21 20" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/>
     </svg>
-  </span>
+  </button>
   <a href="README.md" class="footer-license" target="_blank" rel="noopener">README</a>
   <a href="LICENSE" class="footer-license" target="_blank" rel="noopener">License</a>
 </footer>
+
+<div class="about-popover" id="aboutPopover" role="dialog" aria-label="About Fairwell" hidden>
+  <button class="about-close" type="button" aria-label="Close">&times;</button>
+  <div class="about-title">FAIRWELL</div>
+  <div class="about-version">Version: Adelie 1.0</div>
+</div>
 
 <script src="js/data.js"></script>
 <script src="js/scripts.js"></script>

@@ -1357,8 +1357,36 @@ function sectionDescSeedAsText(key) {
   return (tmp.textContent || '').trim();
 }
 
+function initAboutPopover() {
+  const btn = document.getElementById('footerIglooBtn');
+  const pop = document.getElementById('aboutPopover');
+  if (!btn || !pop) return;
+  const closeBtn = pop.querySelector('.about-close');
+  const setOpen = (open) => {
+    pop.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setOpen(pop.hidden);
+  });
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setOpen(false);
+  });
+  document.addEventListener('click', (e) => {
+    if (pop.hidden) return;
+    if (e.target.closest('#aboutPopover') || e.target.closest('#footerIglooBtn')) return;
+    setOpen(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !pop.hidden) setOpen(false);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   restoreTheme();
   captureSectionDescSeeds();
   renderAll();
+  initAboutPopover();
 });
