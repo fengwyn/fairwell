@@ -66,19 +66,12 @@ body.light-mode .hero .subtitle {
   color: #4a6a92;
 }
 
-/* ── Light-mode hero-corner watermark ── */
+/* ── Light-mode hero-corner logo: position is shared (set in styles.css);
+      only re-tone the glow so it reads against a white background ── */
 body.light-mode .hero::after {
-  content: '';
-  position: absolute;
-  bottom: 12px;
-  right: 40px;
-  width: 48px;
-  height: 48px;
-  background-image: url('../favicon/apple-touch-icon.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.75;
-  pointer-events: none;
+  opacity: 0.82;
+  filter: drop-shadow(0 1px 12px rgba(29,78,216,0.28))
+          drop-shadow(0 0 24px rgba(29,78,216,0.12));
 }
 
 /* ── Nav ── */

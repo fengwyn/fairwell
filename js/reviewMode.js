@@ -418,17 +418,15 @@ function renderReviewBasket() {
   }
 
   if (f.length === 0) {
-    root.innerHTML = `<div class="review-empty">Basket empty — added turnbacks appear here, auto-numbered with your FAIR ID prefix on export.</div>`;
+    root.innerHTML = `<div class="review-empty">Basket empty — added turnbacks appear here, keyed by their turnback code.</div>`;
     return;
   }
 
-  const prefix = (reviewState.meta.fairId || '').trim() || 'FAIR';
-  root.innerHTML = f.map((item, i) => `
+  root.innerHTML = f.map((item) => `
     <div class="review-finding-card">
       <button class="icon-btn-sm rev-finding-remove" onclick="revRemoveFinding(${item.fid})" title="Remove finding">×</button>
       <div class="rev-finding-head">
-        <span class="rev-finding-id">${esc(prefix)}-${String(i + 1).padStart(3, '0')}</span>
-        <span class="rev-finding-tb">TB-${esc(String(item.tid))}</span>
+        <span class="rev-finding-id">TB-${esc(String(item.tid))}</span>
         ${renderSubBadge(item.subcategory)}
       </div>
       <div class="rev-finding-path">${esc(item.doc || '')} / ${esc(item.category || '')}</div>
@@ -442,13 +440,12 @@ function renderReviewExport() {
   if (!root) return;
   const headers = ["ID","Entered By","Entered Date","Process Step","Category","Turnback Description","Corrective Action - Supplier","Part Number","Supplier Code","Supplier Name"];
   const today = new Date().toISOString().slice(0, 10);
-  const prefix = (reviewState.meta.fairId || '').trim() || 'FAIR';
-  const rows = reviewState.findings.map((f, i) => [
-    `${prefix}-${String(i + 1).padStart(3, '0')}`,
+  const rows = reviewState.findings.map((f) => [
+    `${f.tid}`,
     reviewState.meta.enteredBy || '',
     today,
     f.step || '',
-    f.category || '',
+    f.subcategory || '',
     f.description || '',
     '',
     reviewState.meta.partNumber || '',

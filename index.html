@@ -27,7 +27,15 @@
 </div>
 
 <nav class="nav">
-  <button class="nav-btn active" onclick="showSection('relationships')">Document Map</button>
+  <button class="nav-btn active" onclick="showSection('home')">
+    <svg class="nav-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 11.5 12 4l9 7.5"/>
+      <path d="M5 10.5V20h14V10.5"/>
+      <path d="M10 20v-5h4v5"/>
+    </svg>
+    
+  </button>
+  <button class="nav-btn" onclick="showSection('relationships')">Document Map</button>
   <button class="nav-btn" onclick="showSection('hierarchy')">Hierarchy</button>
   <button class="nav-btn" onclick="showSection('decision')">Decision Flow</button>
   <button class="nav-btn" onclick="showSection('forms')">Interactive Forms</button>
@@ -36,8 +44,49 @@
   <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">&#9790;</button>
 </nav>
 
+<!-- SECTION 0: Home — landing page -->
+<div id="home" class="section active">
+  <div class="home-layout">
+    <div class="home-content">
+      <div class="home-eyebrow">FAIRWELL // Version: [Adelie 1.0]</div>
+      <div class="section-header">
+        <h2 class="section-title">Home</h2>
+      </div>
+      <p class="section-desc" data-section-desc="home">FAIRWELL is a lightweight, static front-end for documenting and navigating First Article Inspection (FAI) verification processes. It turns the web of governing documents, hierarchies, decision flows, and inspection forms into an interactive workspace. No build step, no server, opens straight from a browser.</p>
+
+      <div class="home-cards">
+        <section class="home-card">
+          <div class="home-card-label">What this tool does</div>
+          <ul class="home-card-list">
+            <li><strong>Document Map</strong>: Cards for every governing document, with cross-references and links</li>
+            <li><strong>Hierarchy</strong>: Visual tree from enterprise standards down to the operational forms</li>
+            <li><strong>Decision Flow</strong>: Step-by-step guide for deciding which document answers a question</li>
+            <li><strong>Interactive Forms</strong>: AS9102 Forms 1/2/3 with clickable field-level references</li>
+            <li><strong>Generate Turnbacks</strong>: Batch turnback composer that exports to the Findings template</li>
+            <li><strong>Trace</strong>: Drop in FAIR packet PDFs and cross-reference any identifier across them</li>
+          </ul>
+        </section>
+
+        <section class="home-card">
+          <div class="home-card-label">Licensing &amp; fair use</div>
+          <p class="home-card-text"><strong>PolyForm Strict License 1.0.0</strong>. The license permits a narrow set of non-commercial personal uses defined in the license text; modification, distribution, and commercial deployment require a separate paid commercial license.</p>
+          <div class="home-card-actions">
+            <button type="button" class="footer-license" data-doc="license">View License</button>
+            <button type="button" class="footer-license" data-doc="commercial">Commercial Inquiries</button>
+            <button type="button" class="footer-license" data-doc="readme">README</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="home-mascot" aria-hidden="true">
+      <img src="mascots/fairguin.png" alt="" class="home-mascot-img">
+    </div>
+  </div>
+</div>
+
 <!-- SECTION 1: Document Relationships (rendered dynamically) -->
-<div id="relationships" class="section active">
+<div id="relationships" class="section">
   <div class="section-header">
     <h2 class="section-title">Document Relationship Map</h2>
     <button class="add-doc-btn" onclick="openDocModal(-1)">+ Add Document</button>
@@ -253,14 +302,26 @@
       <path d="M13 20 Q13 14.5 17 14.5 Q21 14.5 21 20" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/>
     </svg>
   </button>
-  <a href="README.md" class="footer-license" target="_blank" rel="noopener">README</a>
-  <a href="LICENSE" class="footer-license" target="_blank" rel="noopener">License</a>
+  <button type="button" class="footer-license" data-doc="readme">README</button>
+  <button type="button" class="footer-license" data-doc="commercial">Commercial</button>
+  <button type="button" class="footer-license" data-doc="license">License</button>
 </footer>
 
 <div class="about-popover" id="aboutPopover" role="dialog" aria-label="About Fairwell" hidden>
   <button class="about-close" type="button" aria-label="Close">&times;</button>
   <div class="about-title">FAIRWELL</div>
   <div class="about-version">Version: Adelie 1.0</div>
+</div>
+
+<div class="doc-viewer-overlay" id="docViewerOverlay" role="dialog" aria-modal="true" aria-labelledby="docViewerTitle" hidden>
+  <div class="doc-viewer">
+    <header class="doc-viewer-head">
+      <span class="doc-viewer-eyebrow" id="docViewerEyebrow">FAIRWELL</span>
+      <h2 class="doc-viewer-title" id="docViewerTitle"></h2>
+      <button class="doc-viewer-close" type="button" aria-label="Close">&times;</button>
+    </header>
+    <div class="doc-viewer-body" id="docViewerBody"></div>
+  </div>
 </div>
 
 <script src="js/data.js"></script>

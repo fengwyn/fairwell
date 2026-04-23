@@ -146,8 +146,8 @@ async function indexCertPdf(file, doc) {
 
 function removeCertDoc(id) {
   certTraceState.docs = certTraceState.docs.filter(d => d.id !== id);
+  renderCertDocs();
   if (certTraceState.term) runCertTrace();
-  else renderCertDocs();
 }
 
 function clearAllCertDocs() {
@@ -299,6 +299,7 @@ function renderCertGraph() {
   const cx = W / 2;
   const cy = H / 2;
   const termRadius = 68;
+  const nodeRadius = 24;
   const ringRadius = Math.min(W, H) / 2 - 90;
   const n = results.length;
 
@@ -323,7 +324,16 @@ function renderCertGraph() {
     else if (indexing) stroke = 'var(--accent-cyan)';
     const dashArray = hit ? '' : '6 6';
     const opacity = hit ? 0.9 : 0.55;
-    return `<line x1="${cx}" y1="${cy}" x2="${node.x}" y2="${node.y}"
+    const dx = node.x - cx;
+    const dy = node.y - cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const x1 = cx + termRadius * ux;
+    const y1 = cy + termRadius * uy;
+    const x2 = node.x - nodeRadius * ux;
+    const y2 = node.y - nodeRadius * uy;
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
                   stroke="${stroke}" stroke-width="${strokeWidth}"
                   stroke-dasharray="${dashArray}" opacity="${opacity}"
                   stroke-linecap="round"/>`;
@@ -351,7 +361,7 @@ function renderCertGraph() {
                     : '0';
     return `
       <g class="cert-graph-node cert-graph-node-${node.status}">
-        <circle cx="${node.x}" cy="${node.y}" r="24" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+        <circle cx="${node.x}" cy="${node.y}" r="${nodeRadius}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
         <text x="${node.x}" y="${node.y + 5}" class="cert-node-count" text-anchor="middle">${countText}</text>
         <text x="${labelX}" y="${labelY}" class="cert-node-label" text-anchor="${textAnchor}" title="${certAttr(node.doc.name)}">${esc(label)}</text>
       </g>
@@ -417,8 +427,8 @@ function renderCertResults() {
   }
 
   const sorted = results.slice().sort((a, b) => {
-    const order = { hit: 0, miss: 1, notext: 2, error: 3, indexing: 4 };
-    const d = (order[a.status] || 9) - (order[b.status] || 9);
+    const order = { hit: 0, miss: 3, notext: 1, error: 2, indexing: 4 };
+    const d = (order[a.status] ?? 9) - (order[b.status] ?? 9);
     if (d !== 0) return d;
     return b.hits.length - a.hits.length;
   });

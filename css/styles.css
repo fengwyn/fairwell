@@ -70,11 +70,28 @@ body {
 .hero > * { position: relative; z-index: 1; }
 .hero-toolbar {
   position: absolute;
-  top: 20px;
+  bottom: 20px;
   right: 40px;
   display: flex;
   gap: 8px;
+  z-index: 2;
+}
+/* ── Hero corner logo — present in both themes, faintly glowing ── */
+.hero::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  right: 40px;
+  width: 56px;
+  height: 56px;
+  background-image: url('../favicon/apple-touch-icon.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.88;
+  pointer-events: none;
   z-index: 1;
+  filter: drop-shadow(0 0 14px rgba(125,211,252,0.40))
+          drop-shadow(0 0 28px rgba(125,211,252,0.18));
 }
 .hero h1 {
   font-family: 'DM Sans', sans-serif;
@@ -219,13 +236,124 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.25s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
+.nav-btn .nav-icon {
+  pointer-events: none;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.nav-btn.active .nav-icon { opacity: 1; }
 .nav-btn:hover { background: var(--bg-card); color: var(--text-primary); }
 .nav-btn.active {
   background: var(--bg-card);
   color: var(--accent-blue);
   border-color: var(--border);
   box-shadow: 0 0 12px rgba(59,130,246,0.1);
+}
+
+/* ────────── Home tab ────────── */
+#home {
+  position: relative;
+  min-height: calc(100vh - 220px);
+  padding: 40px;
+}
+.home-layout {
+  position: relative;
+  max-width: 1100px;
+  padding-bottom: 320px;
+}
+.home-content {
+  position: relative;
+  z-index: 1;
+}
+.home-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 22px;
+  margin-top: 12px;
+}
+.home-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px 24px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+}
+.home-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 44px;
+  background: linear-gradient(180deg, var(--accent-blue) 0%, transparent 100%);
+}
+.home-card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: var(--accent-blue);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  opacity: 0.92;
+}
+.home-card-list {
+  padding-left: 18px;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+.home-card-list li { margin-bottom: 7px; }
+.home-card-list li strong { color: var(--text-primary); font-weight: 600; }
+.home-card-text {
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0 0 16px;
+}
+.home-card-text strong { color: var(--text-primary); }
+.home-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 14px;
+}
+.home-card-actions .footer-license {
+  opacity: 0.85;
+  font-size: 0.74rem;
+}
+.home-card-actions .footer-license:hover { opacity: 1; }
+.home-mascot {
+  position: absolute;
+  left: -18px;
+  bottom: -10px;
+  width: min(360px, 36vw);
+  pointer-events: none;
+  z-index: 0;
+}
+.home-mascot-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 18px 36px rgba(0,0,0,0.35))
+          drop-shadow(0 0 28px rgba(125,211,252,0.10));
+}
+@media (max-width: 720px) {
+  .home-layout { padding-bottom: 240px; }
+  .home-mascot { width: 240px; left: -10px; }
 }
 
 /* Sections */
@@ -241,8 +369,36 @@ body {
 }
 .section-title {
   font-family: 'Playfair Display', serif;
-  font-size: 1.8rem;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  color: var(--text-primary);
   margin-bottom: 0;
+  padding: 2px 0 14px 22px;
+  position: relative;
+}
+/* Drafting tick — blueprint anchor, mirrors the hero h1 motif at smaller scale */
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.36em;
+  width: 7px;
+  height: 0.68em;
+  border-left: 2px solid var(--accent-blue);
+  border-top: 2px solid var(--accent-blue);
+  opacity: 0.8;
+}
+/* Drafting rule underline — short fixed-width gradient, anchored under the type */
+.section-title::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  bottom: 0;
+  height: 1px;
+  width: 110px;
+  background: linear-gradient(90deg, var(--accent-blue) 0%, rgba(59,130,246,0.45) 55%, transparent 100%);
 }
 .section-desc {
   color: var(--text-secondary);
@@ -1990,12 +2146,180 @@ select.modal-input {
   color: var(--text-muted);
   text-decoration: none;
   opacity: 0.55;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 4px;
   transition: opacity 0.2s, color 0.2s;
 }
 .footer-license:hover {
   opacity: 1;
   color: var(--text-secondary);
   text-decoration: underline;
+}
+.footer-license:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+}
+
+/* ────────── In-app document viewer (README / Commercial / License) ────────── */
+.doc-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 24, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 4vw;
+  animation: docViewerFadeIn 0.18s ease-out;
+}
+.doc-viewer-overlay[hidden] { display: none; }
+.doc-viewer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
+  width: min(820px, 100%);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: docViewerPopIn 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.doc-viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.doc-viewer-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.doc-viewer-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin: 0;
+  flex: 1;
+}
+.doc-viewer-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 11px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.doc-viewer-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+.doc-viewer-body {
+  padding: 22px 28px;
+  overflow-y: auto;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.92rem;
+}
+.doc-viewer-body > :first-child { margin-top: 0; }
+.doc-viewer-body > :last-child { margin-bottom: 0; }
+.doc-viewer-body h1,
+.doc-viewer-body h2,
+.doc-viewer-body h3 {
+  font-family: 'Playfair Display', serif;
+  color: var(--text-primary);
+  margin: 1.4em 0 0.4em;
+  line-height: 1.2;
+  font-weight: 700;
+}
+.doc-viewer-body h1 { font-size: 1.55rem; }
+.doc-viewer-body h2 { font-size: 1.25rem; }
+.doc-viewer-body h3 { font-size: 1.05rem; }
+.doc-viewer-body p { margin: 0 0 1em; }
+.doc-viewer-body ul,
+.doc-viewer-body ol { padding-left: 1.4em; margin: 0 0 1em; }
+.doc-viewer-body li { margin-bottom: 0.35em; }
+.doc-viewer-body a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+.doc-viewer-body a:hover { text-decoration: underline; }
+.doc-viewer-body strong { color: var(--text-primary); font-weight: 700; }
+.doc-viewer-body em { font-style: italic; }
+.doc-viewer-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  background: rgba(125,211,252,0.10);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+.doc-viewer-body pre {
+  background: rgba(8,12,24,0.45);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 1em;
+}
+.doc-viewer-body pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+}
+.doc-viewer-body blockquote {
+  border-left: 3px solid var(--accent-blue);
+  padding: 2px 14px;
+  margin: 0 0 1em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.doc-viewer-body hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 2em 0;
+}
+.doc-viewer-error {
+  color: var(--accent-rose);
+  background: rgba(244,63,94,0.06);
+  border: 1px solid rgba(244,63,94,0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  font-size: 0.88rem;
+}
+.doc-viewer-error a {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+.doc-viewer-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+@keyframes docViewerFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes docViewerPopIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ────────── Cert Trace ────────── */

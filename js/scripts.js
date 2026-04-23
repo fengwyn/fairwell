@@ -9,7 +9,9 @@ function showSection(id) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  event.target.classList.add('active');
+  const btn = (typeof event !== 'undefined' && event && event.target)
+    ? event.target.closest('.nav-btn') : null;
+  if (btn) btn.classList.add('active');
 }
 
 function showForm(id) {
@@ -1357,6 +1359,168 @@ function sectionDescSeedAsText(key) {
   return (tmp.textContent || '').trim();
 }
 
+// ────────────────────────── In-app document viewer ──────────────────────────
+
+const DOC_VIEWER_REGISTRY = {
+  readme:     { title: 'README',              path: 'README.md' },
+  commercial: { title: 'Commercial Licensing', path: 'COMMERCIAL.md' },
+  license:    { title: 'License',             path: 'LICENSE' }
+};
+
+function initDocViewer() {
+  const overlay = document.getElementById('docViewerOverlay');
+  if (!overlay) return;
+  const closeBtn = overlay.querySelector('.doc-viewer-close');
+
+  document.querySelectorAll('.footer-license[data-doc]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = btn.dataset.doc;
+      if (DOC_VIEWER_REGISTRY[key]) openDocViewer(key);
+    });
+  });
+
+  closeBtn.addEventListener('click', closeDocViewer);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeDocViewer();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !overlay.hidden) closeDocViewer();
+  });
+
+  // Hand-off: links inside the viewer that point at known doc paths swap content
+  // in place rather than navigating away.
+  overlay.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (!link) return;
+    const href = link.getAttribute('href') || '';
+    const key = Object.keys(DOC_VIEWER_REGISTRY).find(k => DOC_VIEWER_REGISTRY[k].path === href);
+    if (key) {
+      e.preventDefault();
+      openDocViewer(key);
+    }
+  });
+}
+
+async function openDocViewer(key) {
+  const reg = DOC_VIEWER_REGISTRY[key];
+  if (!reg) return;
+  const overlay = document.getElementById('docViewerOverlay');
+  const titleEl = document.getElementById('docViewerTitle');
+  const bodyEl = document.getElementById('docViewerBody');
+  titleEl.textContent = reg.title;
+  bodyEl.innerHTML = `<div class="doc-viewer-loading">Loading ${esc(reg.path)}…</div>`;
+  overlay.hidden = false;
+  bodyEl.scrollTop = 0;
+
+  try {
+    const res = await fetch(reg.path, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    bodyEl.innerHTML = renderMarkdown(text);
+    bodyEl.querySelectorAll('a[href^="http"], a[href^="mailto:"]').forEach(a => {
+      a.target = '_blank';
+      a.rel = 'noopener';
+    });
+  } catch (err) {
+    bodyEl.innerHTML = `
+      <div class="doc-viewer-error">
+        Couldn't load <code>${esc(reg.path)}</code> in-app${err && err.message ? ` (${esc(err.message)})` : ''}.
+        This usually happens when Fairwell is opened from the local filesystem;
+        browsers block <code>fetch()</code> against <code>file://</code> URLs.
+        <br><br>
+        <a href="${esc(reg.path)}" target="_blank" rel="noopener">Open ${esc(reg.path)} in a new tab →</a>
+      </div>`;
+  }
+}
+
+function closeDocViewer() {
+  const overlay = document.getElementById('docViewerOverlay');
+  if (overlay) overlay.hidden = true;
+}
+
+// ── Tiny markdown subset renderer ────────────────────────────────────────────
+// Supports: # ## ### headings, paragraphs, **bold**, *italic*, ***both***,
+// `inline code`, ```code fences```, [text](url), - lists, > blockquotes,
+// horizontal rules (---). Trusted-source markdown only — escapes HTML first.
+function renderMarkdown(md) {
+  let text = String(md).replace(/\r\n?/g, '\n');
+
+  // Stash code fences so their interiors aren't munged by inline rules.
+  const fences = [];
+  text = text.replace(/```([\s\S]*?)```/g, (_, code) => {
+    const i = fences.push(code) - 1;
+    return ` FENCE${i} `;
+  });
+
+  // Stash inline code for the same reason.
+  const inlines = [];
+  text = text.replace(/`([^`\n]+?)`/g, (_, code) => {
+    const i = inlines.push(code) - 1;
+    return ` INLINE${i} `;
+  });
+
+  // Escape HTML in everything that remains.
+  text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // Block: headings (# ## ### only — keep it tight)
+  text = text.replace(/^(#{1,3})\s+(.+)$/gm, (_, h, content) => {
+    const level = h.length;
+    return ` B <h${level}>${content}</h${level}> B `;
+  });
+
+  // Block: horizontal rules
+  text = text.replace(/^---+$/gm, ' B <hr> B ');
+
+  // Block: blockquotes — note `>` was escaped to `&gt;`.
+  text = text.replace(/(?:^&gt;\s?.*(?:\n|$))+/gm, (block) => {
+    const inner = block.split('\n').filter(Boolean)
+      .map(l => l.replace(/^&gt;\s?/, '')).join(' ');
+    return ` B <blockquote>${inner}</blockquote> B `;
+  });
+
+  // Block: unordered lists. Capture consecutive `- ` lines.
+  text = text.replace(/(?:^[-*]\s+.+(?:\n|$))+/gm, (block) => {
+    const items = block.trim().split('\n')
+      .map(l => `<li>${l.replace(/^[-*]\s+/, '')}</li>`).join('');
+    return ` B <ul>${items}</ul> B `;
+  });
+
+  // Inline: bold-italic, bold, italic. Order matters.
+  text = text.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  text = text.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\w)/g, '$1<em>$2</em>');
+
+  // Inline: links [text](url). Only allow safe URL schemes.
+  text = text.replace(/\[([^\]]+?)\]\(([^)\s]+)\)/g, (m, label, url) => {
+    if (/^(https?:|mailto:|#)/.test(url) || !/^[a-z]+:/i.test(url)) {
+      return `<a href="${url}">${label}</a>`;
+    }
+    return m;
+  });
+
+  // Paragraphs: split on blank lines, wrap remaining loose text in <p>.
+  // Block markers ( B ) keep already-wrapped blocks from being re-wrapped.
+  text = text.split(/\n{2,}/).map(chunk => {
+    const t = chunk.trim();
+    if (!t) return '';
+    if (t.includes(' B ')) return t.replace(/ B /g, '');
+    return `<p>${t.replace(/\n/g, ' ')}</p>`;
+  }).join('\n');
+
+  // Restore inline code.
+  text = text.replace(/ INLINE(\d+) /g, (_, i) =>
+    `<code>${inlines[Number(i)]
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>`);
+
+  // Restore code fences.
+  text = text.replace(/ FENCE(\d+) /g, (_, i) =>
+    `<pre><code>${fences[Number(i)]
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`);
+
+  return text;
+}
+
 function initAboutPopover() {
   const btn = document.getElementById('footerIglooBtn');
   const pop = document.getElementById('aboutPopover');
@@ -1389,4 +1553,5 @@ document.addEventListener('DOMContentLoaded', () => {
   captureSectionDescSeeds();
   renderAll();
   initAboutPopover();
+  initDocViewer();
 });
