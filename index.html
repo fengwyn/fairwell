@@ -33,7 +33,7 @@
       <path d="M5 10.5V20h14V10.5"/>
       <path d="M10 20v-5h4v5"/>
     </svg>
-    
+    <!-- Label Tag Here: Home -->
   </button>
   <button class="nav-btn" onclick="showSection('relationships')">Document Map</button>
   <button class="nav-btn" onclick="showSection('hierarchy')">Hierarchy</button>
@@ -41,6 +41,13 @@
   <button class="nav-btn" onclick="showSection('forms')">Interactive Forms</button>
   <button class="nav-btn" onclick="showSection('review')">Generate Turnbacks</button>
   <button class="nav-btn" onclick="showSection('certtrace')">Trace</button>
+  <button class="nav-btn" onclick="showSection('construction')" title="Work in progress">
+    <svg class="nav-icon nav-icon-spin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+    </svg>
+    <!-- Label Tag Here: Construction -->
+  </button>
   <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">&#9790;</button>
 </nav>
 
@@ -81,6 +88,9 @@
 
     <div class="home-mascot" aria-hidden="true">
       <img src="mascots/fairguin.png" alt="" class="home-mascot-img">
+    </div>
+    <div class="home-mascot home-mascot-2" aria-hidden="true">
+      <img src="mascots/fairguin_blueprint.png" alt="" class="home-mascot-img">
     </div>
   </div>
 </div>
@@ -262,6 +272,28 @@
     </header>
     <div class="cert-results" id="certResults"></div>
   </section>
+</div>
+
+<!-- SECTION 7: Construction (work-in-progress placeholder) -->
+<div id="construction" class="section">
+  <div class="construction-eyebrow">★ Work in Progress</div>
+  <div class="section-header">
+    <h2 class="section-title">Construction</h2>
+  </div>
+  <p class="section-desc" data-section-desc="construction">This feature is under construction. The penguins are hard at work in the workshop, check back soon to see what they've built!</p>
+
+  <div class="construction-banner" role="img" aria-label="Under construction">
+    <span class="construction-banner-label">⚠ Under Construction ⚠</span>
+  </div>
+
+  <figure class="construction-stage">
+    <img src="mascots/workshop.jpg" alt="Workshop full of penguins building tools and gadgets" class="construction-img">
+    <figcaption class="construction-caption">The Fairwell workshop, building the next batch of features.</figcaption>
+  </figure>
+
+  <div class="construction-footnote">
+    Have a feature in mind? Send it to <button type="button" class="footer-license construction-link" data-doc="commercial">Commercial</button> · in the meantime, head back <button type="button" class="footer-license construction-link" onclick="showSection('home')">Home</button>.
+  </div>
 </div>
 
 <!-- Side Panel -->

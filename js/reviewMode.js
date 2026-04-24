@@ -20,6 +20,7 @@ const reviewState = {
   placeholder: "",
   findings: [],
   panelView: "list",   // list | export
+  editingDesc: false,  // inline-edit state for the Standardized Turnback Text
   meta: { fairId: "", partNumber: "", supplierCode: "", supplierName: "", enteredBy: "" }
 };
 
@@ -214,6 +215,7 @@ function renderSubBadge(sub) {
 function revSelectTurnback(id) {
   reviewState.selectedId = id;
   reviewState.placeholder = "";
+  reviewState.editingDesc = false;
   renderReviewList();
   renderReviewComposer();
 }
@@ -315,10 +317,19 @@ function renderReviewComposer() {
 
       <div class="review-section">
         <div class="review-section-label">Standardized Turnback Text</div>
-        <div class="review-desc-box">
-          ${esc(descParts[0])}${phRender}${esc(descParts[1] || '')}
-        </div>
-        ${phEditor}
+        ${reviewState.editingDesc ? `
+          <textarea class="modal-input modal-textarea rev-desc-editor" id="revDescEditor"
+                    rows="5" placeholder="Turnback text. Use {} to mark where placeholder specifics are injected.">${esc(descSrc)}</textarea>
+          <div class="rev-desc-edit-actions">
+            <button type="button" class="modal-cancel-btn" onclick="revCancelDescEdit()">Cancel</button>
+            <button type="button" class="modal-save-btn" onclick="revSaveDescEdit()">Edit</button>
+          </div>
+        ` : `
+          <div class="review-desc-box review-desc-box-editable" onclick="revStartDescEdit()" title="Click to edit">
+            ${esc(descParts[0])}${phRender}${esc(descParts[1] || '')}
+          </div>
+        `}
+        ${reviewState.editingDesc ? '' : phEditor}
       </div>
 
       ${selected.allow ? `
@@ -356,7 +367,37 @@ function revUpdatePlaceholder(val) {
 function revClearSelection() {
   reviewState.selectedId = null;
   reviewState.placeholder = "";
+  reviewState.editingDesc = false;
   renderReviewList();
+  renderReviewComposer();
+}
+
+function revStartDescEdit() {
+  if (!reviewState.selectedId) return;
+  reviewState.editingDesc = true;
+  renderReviewComposer();
+  const ta = document.getElementById('revDescEditor');
+  if (ta) {
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+}
+
+function revCancelDescEdit() {
+  reviewState.editingDesc = false;
+  renderReviewComposer();
+}
+
+function revSaveDescEdit() {
+  const ta = document.getElementById('revDescEditor');
+  if (!ta) return;
+  const newDesc = ta.value.trim();
+  if (!Array.isArray(appData.reviewTurnbacks)) return;
+  const i = appData.reviewTurnbacks.findIndex(t => t.id === reviewState.selectedId);
+  if (i < 0) { reviewState.editingDesc = false; renderReviewComposer(); return; }
+  appData.reviewTurnbacks[i].desc = newDesc;
+  saveData(appData);
+  reviewState.editingDesc = false;
   renderReviewComposer();
 }
 

@@ -351,10 +351,109 @@ body {
   filter: drop-shadow(0 18px 36px rgba(0,0,0,0.35))
           drop-shadow(0 0 28px rgba(125,211,252,0.10));
 }
+.home-mascot-2 {
+  left: calc(min(360px, 36vw) - 10px);
+}
 @media (max-width: 720px) {
   .home-layout { padding-bottom: 240px; }
   .home-mascot { width: 240px; left: -10px; }
+  .home-mascot-2 { left: 234px; }
 }
+
+/* ────────── Construction tab (work-in-progress) ────────── */
+.nav-icon-spin { transition: transform 0.6s ease; }
+.nav-btn:hover .nav-icon-spin { transform: rotate(90deg); }
+
+#construction {
+  position: relative;
+  padding-bottom: 60px;
+}
+.construction-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  color: var(--accent-amber);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  opacity: 0.92;
+}
+.construction-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 32px;
+  padding: 18px 0;
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #f59e0b 0,
+    #f59e0b 18px,
+    #1a1a1a 18px,
+    #1a1a1a 36px
+  );
+  box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+}
+.construction-banner-label {
+  background: rgba(10, 14, 26, 0.92);
+  color: var(--accent-amber);
+  padding: 10px 28px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.construction-stage {
+  margin: 0 auto;
+  max-width: 820px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.32);
+  position: relative;
+  overflow: hidden;
+}
+.construction-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  box-shadow: inset 0 0 36px rgba(245,158,11,0.08);
+}
+.construction-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+.construction-caption {
+  margin-top: 10px;
+  padding: 6px 10px 4px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.construction-footnote {
+  margin: 28px auto 0;
+  max-width: 820px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+.construction-footnote .construction-link {
+  display: inline;
+  vertical-align: baseline;
+  padding: 0 2px;
+  opacity: 0.85;
+}
+.construction-footnote .construction-link:hover { opacity: 1; }
 
 /* Sections */
 .section { display: none; padding: 40px; animation: fadeIn 0.4s ease; }
@@ -1710,6 +1809,26 @@ select.modal-input {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
+.review-desc-box-editable {
+  cursor: text;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.review-desc-box-editable:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.rev-desc-editor {
+  min-height: 120px;
+  line-height: 1.55;
+  font-size: 0.9rem;
+}
+.rev-desc-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
 .rev-ph {
   display: inline-block;
   padding: 1px 8px;
@@ -2589,6 +2708,37 @@ select.modal-input {
   font-family: 'DM Sans', sans-serif;
   font-size: 0.72rem;
   fill: var(--text-secondary);
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+.cert-node-label:hover {
+  fill: var(--accent-blue);
+  text-decoration: underline;
+}
+.cert-node-label-custom {
+  fill: var(--accent-amber);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.cert-node-label-custom:hover { fill: var(--accent-amber); opacity: 0.85; }
+
+/* Temporary label chip — shown in Doc list and Hits next to the file name */
+.cert-label-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 240px;
+  padding: 2px 10px;
+  background: rgba(245,158,11,0.14);
+  border: 1px solid rgba(245,158,11,0.38);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-amber);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .cert-graph-legend {

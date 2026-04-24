@@ -259,16 +259,55 @@ function renderCertDocs() {
     } else {
       badge = `<span class="cert-doc-badge cert-doc-ok">${d.pageCount}p</span>`;
     }
+    const labelChip = d.label
+      ? `<span class="cert-label-chip" title="Temporary label — click the graph node to edit">${esc(d.label)}</span>`
+      : '';
     return `
       <div class="cert-doc-row">
         <div class="cert-doc-name" title="${certAttr(d.name)}">${esc(d.name)}</div>
+        ${labelChip}
         <div class="cert-doc-right">
           ${badge}
+          <button class="icon-btn-sm" onclick="openCertLabelModal(${d.id})" title="Set temporary label">&#9998;</button>
           <button class="icon-btn-sm delete-btn" onclick="removeCertDoc(${d.id})" title="Remove">×</button>
         </div>
       </div>
     `;
   }).join('');
+}
+
+function openCertLabelModal(docId) {
+  const doc = certTraceState.docs.find(d => d.id === docId);
+  if (!doc) return;
+  const body = `
+    <div style="margin-bottom:10px;">
+      <label class="review-section-label" style="margin-bottom:6px; display:block;">Label for
+        <span style="color:var(--text-primary); font-weight:600;">${esc(doc.name)}</span>
+      </label>
+      <input type="text" class="modal-input" id="certLabelInput"
+             value="${certAttr(doc.label || '')}"
+             placeholder="e.g. Form 1, PO, CoC — leave empty to keep the file name"
+             maxlength="60" autocomplete="off">
+      <div class="modal-hint" style="margin-top:8px;">
+        This is a temporary display label shown in the Link Graph and next to the file name in Hits. It does not rename the file, and it is only kept for this session.
+      </div>
+    </div>
+  `;
+  openModal(`Set Label`, body, () => {
+    const val = document.getElementById('certLabelInput').value.trim();
+    if (val) doc.label = val;
+    else delete doc.label;
+    renderCertDocs();
+    if (certTraceState.results) {
+      renderCertGraph();
+      renderCertResults();
+    }
+    closeModal();
+  });
+  setTimeout(() => {
+    const inp = document.getElementById('certLabelInput');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 0);
 }
 
 function renderCertGraph() {
@@ -348,7 +387,8 @@ function renderCertGraph() {
     if (hit) { fill = 'rgba(59,130,246,0.14)'; stroke = 'var(--accent-blue)'; }
     else if (errored) { fill = 'rgba(244,63,94,0.14)'; stroke = 'var(--accent-rose)'; }
     else if (noText) { fill = 'rgba(245,158,11,0.12)'; stroke = 'var(--accent-amber)'; }
-    const label = node.doc.name.length > 28 ? node.doc.name.slice(0, 26) + '…' : node.doc.name;
+    const displayName = node.doc.label || node.doc.name;
+    const label = displayName.length > 28 ? displayName.slice(0, 26) + '…' : displayName;
     const rightSide = node.x > cx + 4;
     const leftSide = node.x < cx - 4;
     const labelX = rightSide ? node.x + 30 : (leftSide ? node.x - 30 : node.x);
@@ -359,11 +399,14 @@ function renderCertGraph() {
                     : noText ? '—'
                     : node.status === 'indexing' ? '…'
                     : '0';
+    const labelTooltip = node.doc.label
+      ? `${node.doc.label} — click to edit (file: ${node.doc.name})`
+      : `${node.doc.name} — click to set a temporary label`;
     return `
       <g class="cert-graph-node cert-graph-node-${node.status}">
         <circle cx="${node.x}" cy="${node.y}" r="${nodeRadius}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
         <text x="${node.x}" y="${node.y + 5}" class="cert-node-count" text-anchor="middle">${countText}</text>
-        <text x="${labelX}" y="${labelY}" class="cert-node-label" text-anchor="${textAnchor}" title="${certAttr(node.doc.name)}">${esc(label)}</text>
+        <text x="${labelX}" y="${labelY}" class="cert-node-label ${node.doc.label ? 'cert-node-label-custom' : ''}" text-anchor="${textAnchor}" onclick="openCertLabelModal(${node.doc.id})"><title>${esc(labelTooltip)}</title>${esc(label)}</text>
       </g>
     `;
   }).join('');
@@ -454,11 +497,15 @@ function renderCertResults() {
                    : r.status === 'error' ? `<div class="cert-result-note">${esc(r.doc.error || 'Parse error')}</div>`
                    : r.status === 'indexing' ? `<div class="cert-result-note">Still parsing — re-run trace when done.</div>`
                    : '';
+    const labelChip = r.doc.label
+      ? `<span class="cert-label-chip" title="Temporary label">${esc(r.doc.label)}</span>`
+      : '';
     return `
       <div class="cert-result-row ${cls}">
         <div class="cert-result-head">
           <span class="cert-result-icon">${icon}</span>
           <span class="cert-result-name">${esc(r.doc.name)}</span>
+          ${labelChip}
           <span class="cert-result-count">${r.hits.length} hit${r.hits.length === 1 ? '' : 's'}</span>
         </div>
         ${statusNote}
