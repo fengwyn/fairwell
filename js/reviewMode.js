@@ -20,6 +20,7 @@ const reviewState = {
   placeholder: "",
   findings: [],
   panelView: "list",   // list | export
+  findingSearch: "",   // free-text filter over the findings basket
   editingDesc: false,  // inline-edit state for the Standardized Turnback Text
   meta: { fairId: "", partNumber: "", supplierCode: "", supplierName: "", enteredBy: "" }
 };
@@ -437,20 +438,44 @@ function revClearAllFindings() {
   if (!reviewState.findings.length) return;
   if (!confirm('Clear all findings from the basket?')) return;
   reviewState.findings = [];
+  reviewState.findingSearch = "";
+  const searchEl = document.getElementById('revBasketSearch');
+  if (searchEl) searchEl.value = '';
   renderReviewBasket();
   renderReviewComposer();
+}
+
+function revUpdateFindingSearch(val) {
+  reviewState.findingSearch = val;
+  renderReviewBasket();
 }
 
 // === RENDER: basket ===
 function renderReviewBasket() {
   const root = document.getElementById('revBasket');
   const countEl = document.getElementById('revBasketCount');
+  const filtersEl = document.getElementById('revBasketFilters');
   if (!root) return;
 
   const f = reviewState.findings;
+  const q = (reviewState.findingSearch || '').trim().toLowerCase();
+  const filtered = q ? f.filter(item => {
+    const hay = `TB-${item.tid} ${item.description || ''} ${item.step || ''} ${item.category || ''} ${item.subcategory || ''} ${item.doc || ''}`.toLowerCase();
+    return hay.includes(q);
+  }) : f;
+
   if (countEl) {
-    countEl.textContent = String(f.length).padStart(2, '0');
-    countEl.classList.toggle('review-basket-count-has', f.length > 0);
+    const total = f.length;
+    const shown = filtered.length;
+    countEl.textContent = q && total
+      ? `${String(shown).padStart(2, '0')} / ${String(total).padStart(2, '0')}`
+      : String(total).padStart(2, '0');
+    countEl.classList.toggle('review-basket-count-has', total > 0);
+  }
+
+  // Filter row is only meaningful in List view — export always dumps every finding.
+  if (filtersEl) {
+    filtersEl.style.display = (reviewState.panelView === 'export') ? 'none' : '';
   }
 
   if (reviewState.panelView === 'export') {
@@ -463,7 +488,12 @@ function renderReviewBasket() {
     return;
   }
 
-  root.innerHTML = f.map((item) => `
+  if (filtered.length === 0) {
+    root.innerHTML = `<div class="review-empty">No findings match "${esc(q)}". <a href="#" onclick="event.preventDefault(); revUpdateFindingSearch(''); document.getElementById('revBasketSearch').value='';">Clear search</a> to see all ${f.length}.</div>`;
+    return;
+  }
+
+  root.innerHTML = filtered.map((item) => `
     <div class="review-finding-card">
       <button class="icon-btn-sm rev-finding-remove" onclick="revRemoveFinding(${item.fid})" title="Remove finding">×</button>
       <div class="rev-finding-head">

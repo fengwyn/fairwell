@@ -210,6 +210,12 @@
         <button class="review-tab active" id="revTabList" onclick="revSetPanelView('list')">List</button>
         <button class="review-tab" id="revTabExport" onclick="revSetPanelView('export')">Export</button>
       </div>
+      <div class="review-basket-filters" id="revBasketFilters">
+        <input type="text" class="modal-input review-basket-search" id="revBasketSearch"
+               placeholder="Search findings — code, description, block, level…"
+               autocomplete="off"
+               oninput="revUpdateFindingSearch(this.value)">
+      </div>
       <div class="review-basket" id="revBasket"></div>
     </section>
   </div>
@@ -359,7 +365,7 @@
 <script src="js/data.js"></script>
 <script src="js/scripts.js"></script>
 <script src="js/reviewMode.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="lib/pdfjs/pdf.js"></script>
 <script src="js/certTrace.js"></script>
 </body>
 </html>

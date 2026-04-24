@@ -56,7 +56,7 @@ The moon/sun button in the navigation bar toggles between dark and light mode.
 
 ## License
 
-Source-available under [PolyForm Strict License 1.0.0](LICENSE). The license is narrow — it permits source review and a small set of personal uses defined in the license text, and does **not** grant rights to use FAIRWELL commercially, to modify it, or to redistribute it. No warranty, no liability.
+[PolyForm Strict License 1.0.0](LICENSE). The license is narrow; it permits a small set of personal uses defined in the license text, and does **not** grant rights to use FAIRWELL commercially, to modify it, or to redistribute it. No warranty, no liability.
 
 For commercial use, modification, redistribution, hosting, or any derivative work, a separate paid commercial license is required. See [COMMERCIAL.md](COMMERCIAL.md) for the inquiry funnel and contact details.
 

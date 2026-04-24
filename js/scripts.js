@@ -659,9 +659,11 @@ function openDocModal(idx) {
       <div class="modal-field">
         <label>URL</label>
         <div class="modal-link-row" id="mdDocUrlRow">
-          <input type="text" class="modal-input link-url" id="mdDocUrl" value="${esc(doc.url)}" placeholder="URL or file path">
-          <button class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
+          <input type="text" class="modal-input link-url" id="mdDocUrl" value="${esc(doc.url)}" placeholder="Drop a file here, paste URL, or /absolute/path">
+          <button type="button" class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
+          <button type="button" class="icon-btn-sm manual-link-btn" title="Type absolute path manually">\u{270E}</button>
         </div>
+        <div class="link-hint">Drag a file from your file manager onto this field, click \u{1F4C1} to browse, or \u{270E} to type a path.</div>
       </div>
     </div>
     <div class="modal-field">
@@ -689,7 +691,7 @@ function openDocModal(idx) {
       badge: manualBadge || selectedType.label,
       colorClass: selectedType.colorId,
       title: document.getElementById('mdDocTitle').value,
-      url: document.getElementById('mdDocUrl').value || '#',
+      url: normalizeLocalPath(document.getElementById('mdDocUrl').value) || '#',
       role: document.getElementById('mdDocRole').value,
       desc: document.getElementById('mdDocDesc').value,
       links: collectLinks()
@@ -713,9 +715,10 @@ function openDocModal(idx) {
     row.dataset.li = i;
     row.innerHTML = `
       <input type="text" class="modal-input link-text" value="" placeholder="Link text">
-      <input type="text" class="modal-input link-url" value="#" placeholder="URL or file path">
-      <button class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
-      <button class="icon-btn-sm remove-link-btn">&times;</button>
+      <input type="text" class="modal-input link-url" value="#" placeholder="Drop a file, paste URL, or /absolute/path">
+      <button type="button" class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
+      <button type="button" class="icon-btn-sm manual-link-btn" title="Type absolute path manually">\u{270E}</button>
+      <button type="button" class="icon-btn-sm remove-link-btn">&times;</button>
     `;
     container.appendChild(row);
     wireLinkRow(row);
@@ -724,19 +727,234 @@ function openDocModal(idx) {
   // Wire existing rows
   document.querySelectorAll('#mdDocLinks .modal-link-row').forEach(wireLinkRow);
 
-  // Wire the main doc URL browse button
+  // Wire the main doc URL: browse + manual buttons + drop zone on the whole row.
+  const mainUrlInput = document.getElementById('mdDocUrl');
   document.querySelector('#mdDocUrlRow .browse-link-btn').onclick = () =>
-    pickFile((file) => { document.getElementById('mdDocUrl').value = file.path || file.name; });
+    pickFileIntoInput(mainUrlInput, null);
+  const mainManualBtn = document.querySelector('#mdDocUrlRow .manual-link-btn');
+  if (mainManualBtn) mainManualBtn.onclick = () => promptForManualPath(mainUrlInput);
+  wireDropToInput(mainUrlInput, document.getElementById('mdDocUrlRow'));
 }
 
 function wireLinkRow(row) {
   row.querySelector('.remove-link-btn').onclick = () => row.remove();
-  row.querySelector('.browse-link-btn').onclick = () => pickFile((file) => {
-    const urlInput = row.querySelector('.link-url');
-    const textInput = row.querySelector('.link-text');
-    urlInput.value = file.path || file.name;
-    if (!textInput.value.trim()) textInput.value = file.name;
+  const urlInput = row.querySelector('.link-url');
+  const textInput = row.querySelector('.link-text');
+  row.querySelector('.browse-link-btn').onclick = () => pickFileIntoInput(urlInput, textInput);
+  const manualBtn = row.querySelector('.manual-link-btn');
+  if (manualBtn) manualBtn.onclick = () => promptForManualPath(urlInput);
+  wireDropToInput(urlInput, row);
+}
+
+// Normalize a user-entered path or URL into something a browser can actually
+// follow. Bare absolute paths become file:// URLs so that links to local
+// documents resolve correctly instead of being treated as project-relative.
+// Path bodies are percent-encoded so spaces and non-ASCII don't break the URL.
+function safeDecodeURI(str) {
+  try {
+    return decodeURI(str);
+  } catch {
+    // Fix invalid % sequences like %A → %25A
+    return str.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+  }
+}
+
+function normalizeLocalPath(input) {git 
+  let t = input.trim();
+
+  // Handle file:// URLs explicitly
+  if (/^file:\/\//i.test(t)) {
+    let pathPart = t.replace(/^file:\/\/\/?/i, '/');
+
+    pathPart = safeDecodeURI(pathPart);
+
+    return 'file://' + encodeFilePath(pathPart);
+  }
+
+  // Other URLs (http, https, etc.)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
+
+  // Local path
+  return 'file://' + encodeFilePath(safeDecodeURI(t));
+}
+
+// Percent-encode a filesystem path for use in a URL. encodeURI preserves the
+// structural characters browsers leave alone (`/`, `:`, `&`, `=`, `@`, etc.)
+// and encodes spaces, non-ASCII, control chars, and `%`. We post-encode `#`
+// and `?` so filenames containing them don't get misread as fragments/queries.
+function encodeFilePath(p) {
+  return encodeURI(p).replace(/#/g, '%23').replace(/\?/g, '%3F');
+}
+
+// Picker → input helper. On Electron/webview, File.path is the real absolute
+// path and we use it directly. In a regular browser, the file picker does not
+// expose absolute paths, so we chain straight into the manual-entry prompt
+// (pre-seeded with the basename the user just picked).
+async function pickFileIntoInput(urlInput, textInput) {
+  await pickFile((file) => {
+    if (textInput && !textInput.value.trim()) textInput.value = file.name;
+    if (file.path) {
+      urlInput.value = normalizeLocalPath(file.path);
+      return;
+    }
+    promptForManualPath(urlInput, {
+      reason: `Browsers hide absolute paths from the file picker. Picked: "${file.name}".`,
+      seedFilename: file.name
+    });
   });
+}
+
+// Open a text prompt so the user can paste or type an absolute path or URL.
+// Pre-seeds with the current input value (decoded back to a human-readable
+// path if it looks like a file:// URL). Called from the "Type manually"
+// button AND as a fallback when drop/browse can't deliver an absolute path.
+function promptForManualPath(urlInput, opts) {
+  opts = opts || {};
+  const current = (urlInput.value || '').trim();
+  let seed = '';
+  if (current && current !== '#') {
+    if (/^file:\/\//i.test(current)) {
+      try {
+        seed = decodeURI(current.replace(/^file:\/\/\/?/i, '/'));
+      } catch (_) { seed = current; }
+    } else {
+      seed = current;
+    }
+  } else if (opts.seedFilename) {
+    seed = `/path/to/${opts.seedFilename}`;
+  }
+  const preamble = opts.reason ? `${opts.reason}\n\n` : '';
+  const entered = prompt(
+    `${preamble}Paste or type an absolute path or URL:\n\n` +
+    `  Linux / macOS:  /home/you/docs/file.pdf\n` +
+    `  Windows:        C:\\Users\\you\\Documents\\file.pdf\n` +
+    `  Web URL:        https://example.com/file.pdf`,
+    seed
+  );
+  if (entered == null) return;
+  const trimmed = entered.trim();
+  if (!trimmed) return;
+  urlInput.value = normalizeLocalPath(trimmed);
+  fillSiblingTextFromUrl(urlInput, urlInput.value);
+}
+
+// Make a URL input (and optionally a wider drop zone wrapping it) accept file
+// drops. File-manager drops deliver a pre-encoded file:// URL via
+// `text/uri-list` — that is the path-of-least-friction for users on any OS.
+function wireDropToInput(inputEl, zoneEl) {
+  if (!inputEl) return;
+  const zone = zoneEl || inputEl;
+  if (zone.dataset.dropWired) return;
+  zone.dataset.dropWired = '1';
+
+  const setHover = (on) => {
+    zone.classList.toggle('drop-hover', on);
+    inputEl.classList.toggle('drop-hover', on);
+  };
+
+  const accept = (e) => {
+    if (!e.dataTransfer) return false;
+    const types = Array.from(e.dataTransfer.types || []);
+    return types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain');
+  };
+
+  // dragenter AND dragover must both preventDefault for the drop to fire in
+  // every browser — Chromium is lenient, Firefox/Safari are stricter.
+  zone.addEventListener('dragenter', (e) => {
+    if (!accept(e)) return;
+    e.preventDefault();
+    setHover(true);
+  });
+  zone.addEventListener('dragover', (e) => {
+    if (!accept(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'link';
+    setHover(true);
+  });
+  zone.addEventListener('dragleave', (e) => {
+    if (zone.contains(e.relatedTarget)) return;
+    setHover(false);
+  });
+  zone.addEventListener('drop', (e) => {
+    if (!accept(e)) return;
+    e.preventDefault();
+    setHover(false);
+    const dt = e.dataTransfer;
+
+    // 1. Preferred: file-manager drop — pre-encoded file:// URL, exactly what we want.
+    const uriList = dt.getData('text/uri-list');
+    if (uriList) {
+      const first = uriList.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#'));
+      if (first) {
+        inputEl.value = first;
+        fillSiblingTextFromUrl(inputEl, first);
+        return;
+      }
+    }
+
+    // 2. Plain text drop (e.g. from a terminal or another app).
+    const text = dt.getData('text/plain');
+    if (text) {
+      const first = text.split('\n').map(l => l.trim()).find(l => l);
+      if (first) {
+        inputEl.value = normalizeLocalPath(first);
+        fillSiblingTextFromUrl(inputEl, inputEl.value);
+        return;
+      }
+    }
+
+    // 3. DataTransfer.files — useful in Electron (has file.path) or as a last-
+    //    resort filename hint. If no absolute path is available, fall straight
+    //    through to the manual-entry prompt so the user is never stuck.
+    if (dt.files && dt.files.length > 0) {
+      const file = dt.files[0];
+      if (file.path) {
+        inputEl.value = normalizeLocalPath(file.path);
+        const row = inputEl.closest('.modal-link-row');
+        const textInput = row && row.querySelector('.link-text');
+        if (textInput && !textInput.value.trim()) textInput.value = file.name;
+        return;
+      }
+      promptForManualPath(inputEl, {
+        reason: `Dropped "${file.name}" but this drop source didn't include the absolute path.`,
+        seedFilename: file.name
+      });
+      return;
+    }
+
+    // 4. Nothing usable — open the manual prompt anyway so the gesture isn't wasted.
+    promptForManualPath(inputEl, {
+      reason: `The drop didn't include a path — you can paste or type one below.`
+    });
+  });
+}
+
+// Global guard: prevent the browser from navigating to a file when the user
+// drops it ANYWHERE except a real drop zone. Without this, a missed drop on
+// the modal chrome (rather than exactly on the URL row) causes the page to
+// navigate away from Fairwell, which looks exactly like "drag-drop doesn't
+// work". Zone handlers fire first (bubble phase) and preventDefault early;
+// this catches the rest.
+function installFileDropGuard() {
+  if (window.__fwFileDropGuard) return;
+  window.__fwFileDropGuard = true;
+  const hasFiles = (e) => e.dataTransfer
+    && Array.from(e.dataTransfer.types || []).includes('Files');
+  window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop',     (e) => { if (hasFiles(e)) e.preventDefault(); });
+}
+
+// If the drop target is inside a link row and the label field is empty, seed
+// the label with a readable filename decoded from the URL's last path segment.
+function fillSiblingTextFromUrl(inputEl, url) {
+  const row = inputEl.closest('.modal-link-row');
+  if (!row) return;
+  const textInput = row.querySelector('.link-text');
+  if (!textInput || textInput.value.trim()) return;
+  try {
+    const basename = decodeURIComponent((new URL(url, 'file:///').pathname.split('/').pop() || '').trim());
+    if (basename) textInput.value = basename;
+  } catch (_) { /* invalid URL — leave label alone */ }
 }
 
 async function pickFile(onFile) {
@@ -769,7 +987,8 @@ function collectLinks() {
   const links = [];
   rows.forEach(row => {
     const text = row.querySelector('.link-text').value.trim();
-    const url = row.querySelector('.link-url').value.trim() || '#';
+    const rawUrl = row.querySelector('.link-url').value.trim();
+    const url = normalizeLocalPath(rawUrl) || '#';
     if (text) links.push({ text, url });
   });
   return links;
@@ -1554,4 +1773,5 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   initAboutPopover();
   initDocViewer();
+  installFileDropGuard();
 });

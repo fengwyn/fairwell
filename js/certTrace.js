@@ -4,7 +4,9 @@
 // page, and renders a radial link graph + per-document hit list.
 // State is session-only — nothing touches localStorage or the network.
 
-const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_WORKER_URL      = 'lib/pdfjs/pdf.worker.js';
+const PDFJS_CMAP_URL        = 'lib/pdfjs/cmaps/';
+const PDFJS_STANDARD_FONTS  = 'lib/pdfjs/standard_fonts/';
 
 const certTraceState = {
   docs: [],           // { id, name, size, pageCount, textLayerPresent, indexing, error, pages }
@@ -124,7 +126,12 @@ async function addCertFiles(fileList) {
 
 async function indexCertPdf(file, doc) {
   const buf = await file.arrayBuffer();
-  const task = pdfjsLib.getDocument({ data: buf });
+  const task = pdfjsLib.getDocument({
+    data: buf,
+    cMapUrl: PDFJS_CMAP_URL,
+    cMapPacked: true,
+    standardFontDataUrl: PDFJS_STANDARD_FONTS
+  });
   const pdf = await task.promise;
   doc.pageCount = pdf.numPages;
   const pages = [];
