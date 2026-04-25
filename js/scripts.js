@@ -759,8 +759,10 @@ function safeDecodeURI(str) {
   }
 }
 
-function normalizeLocalPath(input) {git 
-  let t = input.trim();
+function normalizeLocalPath(input) {
+  if (!input) return '';
+  let t = String(input).trim();
+  if (!t || t === '#') return t;
 
   // Handle file:// URLs explicitly
   if (/^file:\/\//i.test(t)) {
