@@ -84,10 +84,15 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Phase 1 will swap IsAuthenticated for a custom IsAuthenticatedAndSubscribed.
-# Default fails closed: every endpoint requires auth unless explicitly opened.
+AUTH_USER_MODEL = 'accounts.User'
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'login'
+
+# Stub today; Phase 3 will check active Stripe subscription.
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'accounts.permissions.IsAuthenticatedAndSubscribed',
     ],
 }
