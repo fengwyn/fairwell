@@ -20,6 +20,10 @@
     <button class="toolbar-btn" onclick="handleLoadJson()">Load Data</button>
     <button class="toolbar-btn" onclick="handleExport()">Export Data</button>
     <button class="toolbar-btn" onclick="handleReset()">Reset to Defaults</button>
+    <form method="post" action="{% url 'logout' %}" style="display: contents">
+      {% csrf_token %}
+      <button type="submit" class="toolbar-btn" title="Signed in as {{ user.username }}">Logout</button>
+    </form>
   </div>
   <h1>FAIR<strong>WELL</strong></h1>
   <div class="subtitle"></div>
