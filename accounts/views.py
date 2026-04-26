@@ -1,8 +1,6 @@
 from django.contrib.auth import login
 from django.shortcuts import redirect, render
 
-from core.seeders import seed_user
-
 from .forms import SignupForm
 
 
@@ -13,7 +11,6 @@ def signup_view(request):
         form = SignupForm(request.POST)
         if form.is_valid():
             user = form.save()
-            seed_user(user)
             login(request, user)
             return redirect('home')
     else:

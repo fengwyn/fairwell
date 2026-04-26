@@ -44,6 +44,46 @@ class Type(models.Model):
         return f'{self.owner_id}/{self.slug}'
 
 
+class CatalogEntry(models.Model):
+    """One JSON blob per (owner, kind). Mirrors the localStorage `appData[kind]` shape.
+
+    Each kind is the entire payload the SPA reads/writes for that tab — hierarchy,
+    decisionFlow, form1Fields, etc. Keeping each as a single JSON blob mirrors the
+    legacy localStorage model and lets us migrate JS surfaces incrementally.
+    """
+
+    KINDS = [
+        ('hierarchy', 'Hierarchy'),
+        ('decisionFlow', 'Decision Flow'),
+        ('form1Fields', 'Form 1 Fields'),
+        ('form2Fields', 'Form 2 Fields'),
+        ('form3Fields', 'Form 3 Fields'),
+        ('reviewTurnbacks', 'Review Turnbacks'),
+        ('reviewRefMeta', 'Review Ref Meta'),
+        ('descriptions', 'Descriptions'),
+        ('specialChars', 'Special Chars'),
+    ]
+    VALID_KINDS = frozenset(k for k, _ in KINDS)
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='catalog_entries',
+    )
+    kind = models.CharField(max_length=32, choices=KINDS)
+    data = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['owner', 'kind'], name='uniq_catalog_owner_kind'),
+        ]
+        ordering = ['kind']
+
+    def __str__(self):
+        return f'{self.owner_id}/{self.kind}'
+
+
 class Document(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,

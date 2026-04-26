@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Color, Document, Type
+from .models import CatalogEntry, Color, Document, Type
+
+
+@admin.register(CatalogEntry)
+class CatalogEntryAdmin(admin.ModelAdmin):
+    list_display = ('owner', 'kind', 'updated_at')
+    list_filter = ('kind', 'owner')
 
 
 @admin.register(Color)

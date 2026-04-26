@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from .models import Color, Document, Type
+from .models import CatalogEntry, Color, Document, Type
 
 User = get_user_model()
 
@@ -183,16 +183,85 @@ class ColorApiTests(APITestCase):
         self.assertEqual(resp.json()['id'], 'customblue')
 
 
+class CatalogApiTests(APITestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(username='alice', password='pw-test-1!')
+        self.bob = User.objects.create_user(username='bob', password='pw-test-2!')
+        CatalogEntry.objects.create(
+            owner=self.alice, kind='hierarchy', data=[{'level': 'top', 'cards': []}],
+        )
+        CatalogEntry.objects.create(
+            owner=self.alice, kind='descriptions', data={'home': 'Alice home desc'},
+        )
+
+    def test_anonymous_get_is_unauthorized(self):
+        self.assertEqual(self.client.get('/api/catalog/').status_code, 401)
+
+    def test_owner_gets_their_catalog(self):
+        self.client.force_login(self.alice)
+        body = self.client.get('/api/catalog/').json()
+        self.assertEqual(set(body), {'hierarchy', 'descriptions'})
+        self.assertEqual(body['hierarchy'], [{'level': 'top', 'cards': []}])
+        self.assertEqual(body['descriptions'], {'home': 'Alice home desc'})
+
+    def test_other_user_does_not_see_alice_data(self):
+        self.client.force_login(self.bob)
+        body = self.client.get('/api/catalog/').json()
+        self.assertEqual(body, {})
+
+    def test_patch_upserts_new_kind(self):
+        self.client.force_login(self.alice)
+        resp = self.client.patch(
+            '/api/catalog/', {'specialChars': ['§', '→']}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        body = resp.json()
+        self.assertEqual(body['specialChars'], ['§', '→'])
+        # existing kinds preserved
+        self.assertEqual(body['hierarchy'], [{'level': 'top', 'cards': []}])
+
+    def test_patch_updates_existing_kind(self):
+        self.client.force_login(self.alice)
+        resp = self.client.patch(
+            '/api/catalog/', {'hierarchy': [{'level': 'replaced'}]}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.json()['hierarchy'], [{'level': 'replaced'}])
+
+    def test_patch_rejects_unknown_kind(self):
+        self.client.force_login(self.alice)
+        resp = self.client.patch(
+            '/api/catalog/', {'malicious': 'value'}, format='json',
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('malicious', resp.json()['detail'])
+
+    def test_patch_rejects_non_dict_body(self):
+        self.client.force_login(self.alice)
+        resp = self.client.patch('/api/catalog/', ['not', 'a', 'dict'], format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_patch_does_not_leak_to_other_user(self):
+        self.client.force_login(self.bob)
+        self.client.patch('/api/catalog/', {'hierarchy': ['bob-only']}, format='json')
+        self.assertEqual(
+            CatalogEntry.objects.get(owner=self.alice, kind='hierarchy').data,
+            [{'level': 'top', 'cards': []}],
+        )
+
+
 class SeederTests(APITestCase):
     def test_seed_user_is_idempotent_across_categories(self):
         from .seeders import seed_user
         user = User.objects.create_user(username='seed', password='pw-test-3!')
         first = seed_user(user)
         second = seed_user(user)
-        for key in ('colors', 'types', 'documents'):
+        for key in ('colors', 'types', 'documents', 'catalog'):
             self.assertIn(key, first)
             self.assertEqual(second[key], 0, f'{key} reseed should add zero')
         if first['documents']:
             self.assertGreater(Document.objects.filter(owner=user).count(), 0)
             self.assertGreater(Type.objects.filter(owner=user).count(), 0)
             self.assertGreater(Color.objects.filter(owner=user).count(), 0)
+        if first['catalog']:
+            self.assertGreater(CatalogEntry.objects.filter(owner=user).count(), 0)

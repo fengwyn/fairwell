@@ -1,5 +1,7 @@
 """Development settings: DEBUG on, SQLite, permissive hosts."""
 
+from decouple import config
+
 from .base import *  # noqa: F401,F403
 
 DEBUG = True
@@ -13,3 +15,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
 WHITENOISE_MAX_AGE = 0
+
+# Set DEV_DB_PATH in .env to point at an external SSD; on the gentoo Pi this
+# avoids hammering the boot SD card with SQLite writes.
+DATABASES['default']['NAME'] = config(
+    'DEV_DB_PATH',
+    default=str(BASE_DIR / 'db.sqlite3'),
+)

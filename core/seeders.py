@@ -5,7 +5,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from .models import Color, Document, Type
+from .models import CatalogEntry, Color, Document, Type
 
 
 def _load_seed():
@@ -88,6 +88,24 @@ def seed_documents(user, data=None) -> int:
     return created
 
 
+def seed_catalog(user, data=None) -> int:
+    """Seed CatalogEntry rows for any catalog kind present in data.json.
+
+    Idempotent: skips kinds already saved for this user.
+    """
+    data = data if data is not None else _load_seed()
+    if not data:
+        return 0
+    existing = set(CatalogEntry.objects.filter(owner=user).values_list('kind', flat=True))
+    created = 0
+    for kind in CatalogEntry.VALID_KINDS:
+        if kind in existing or kind not in data:
+            continue
+        CatalogEntry.objects.create(owner=user, kind=kind, data=data[kind])
+        created += 1
+    return created
+
+
 def seed_user(user) -> dict:
     """Seed everything we have a model for. Returns counts per category."""
     data = _load_seed()
@@ -95,4 +113,5 @@ def seed_user(user) -> dict:
         'colors': seed_colors(user, data),
         'types': seed_types(user, data),
         'documents': seed_documents(user, data),
+        'catalog': seed_catalog(user, data),
     }
