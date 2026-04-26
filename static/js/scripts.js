@@ -51,11 +51,113 @@ function renderDocGrid() {
   });
 }
 
-function deleteDocument(idx) {
+async function deleteDocument(idx) {
   if (!confirm('Delete this document?')) return;
-  appData.documents.splice(idx, 1);
-  saveData(appData);
+  const doc = appData.documents[idx];
+  if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
+    try {
+      await apiDeleteDocument(doc.id);
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+      return;
+    }
+    appData.documents.splice(idx, 1);
+  } else {
+    appData.documents.splice(idx, 1);
+    saveData(appData);
+  }
   renderDocGrid();
+}
+
+async function hydrateCatalogFromApi() {
+  try {
+    const [colors, types, documents] = await Promise.all([
+      apiFetchColors(),
+      apiFetchTypes(),
+      apiFetchDocuments(),
+    ]);
+    if (Array.isArray(colors) && colors.length) appData.colors = colors;
+    if (Array.isArray(types) && types.length) appData.types = types;
+    appData.documents = documents;
+    applyCustomColors();
+    if (typeof renderLegend === 'function') renderLegend();
+    renderDocGrid();
+  } catch (err) {
+    console.error('Failed to hydrate catalog from API:', err);
+  }
+}
+
+function openManageTypesModal() {
+  const renderBody = () => {
+    const colors = getColors(appData);
+    const types = getTypes(appData);
+    const colorOpts = colors.map(c =>
+      `<option value="${esc(c.id)}">${esc(c.label)}</option>`
+    ).join('');
+
+    const list = types.length === 0
+      ? `<div class="modal-empty-hint">No types yet. Add one below.</div>`
+      : types.map(t => {
+          const color = (colors.find(c => c.id === t.colorId) || {});
+          return `
+            <div class="legend-item" data-slug="${esc(t.id)}">
+              <div class="legend-dot" style="background:var(--${esc(t.colorId)}, var(--accent-blue))"></div>
+              <span class="legend-label">${esc(t.label)}</span>
+              <span class="legend-sub">${esc(color.label || t.colorId || '—')}</span>
+              <div class="legend-actions">
+                <button class="icon-btn-sm del-type-btn" data-slug="${esc(t.id)}" title="Delete type">&times;</button>
+              </div>
+            </div>`;
+        }).join('');
+
+    return `
+      <div class="manage-types-list">${list}</div>
+      <div class="manage-types-add">
+        <input type="text" class="modal-input" id="newTypeLabel" placeholder="New type label (e.g. SUPPLEMENT)">
+        <select class="modal-input" id="newTypeColor">${colorOpts}</select>
+        <button class="panel-add-btn" id="addTypeBtn">+ Add</button>
+      </div>
+    `;
+  };
+
+  const refresh = () => {
+    document.getElementById('modalBody').innerHTML = renderBody();
+    wireRows();
+  };
+
+  const wireRows = () => {
+    document.querySelectorAll('.del-type-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const slug = btn.dataset.slug;
+        if (!confirm(`Delete type "${slug}"?`)) return;
+        try {
+          await apiDeleteType(slug);
+          appData.types = appData.types.filter(t => t.id !== slug);
+          refresh();
+        } catch (err) {
+          alert('Delete failed: ' + err.message);
+        }
+      };
+    });
+    const addBtn = document.getElementById('addTypeBtn');
+    if (addBtn) {
+      addBtn.onclick = async () => {
+        const label = document.getElementById('newTypeLabel').value.trim();
+        const colorId = document.getElementById('newTypeColor').value;
+        if (!label) { alert('Label is required'); return; }
+        try {
+          const created = await apiCreateType({ label, colorId });
+          appData.types.push(created);
+          refresh();
+        } catch (err) {
+          alert('Add failed: ' + err.message);
+        }
+      };
+    }
+  };
+
+  openModal('Manage Document Types', renderBody(), () => closeModal());
+  wireRows();
 }
 
 // ────────────────────────── Hierarchy ──────────────────────────
@@ -681,7 +783,7 @@ function openDocModal(idx) {
     </div>
   `;
 
-  openModal(isEdit ? 'Edit Document' : 'Add Document', body, () => {
+  openModal(isEdit ? 'Edit Document' : 'Add Document', body, async () => {
     const selectedTypeId = document.getElementById('mdDocType').value;
     const selectedType = getTypes(appData).find(t => t.id === selectedTypeId) || firstType;
     const manualBadge = document.getElementById('mdDocBadge').value.trim();
@@ -696,12 +798,22 @@ function openDocModal(idx) {
       desc: document.getElementById('mdDocDesc').value,
       links: collectLinks()
     };
-    if (isEdit) {
-      appData.documents[idx] = updated;
+    if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
+      try {
+        const saved = isEdit
+          ? await apiUpdateDocument(doc.id, updated)
+          : await apiCreateDocument(updated);
+        if (isEdit) appData.documents[idx] = saved;
+        else appData.documents.push(saved);
+      } catch (err) {
+        alert('Save failed: ' + err.message);
+        return;
+      }
     } else {
-      appData.documents.push(updated);
+      if (isEdit) appData.documents[idx] = updated;
+      else appData.documents.push(updated);
+      saveData(appData);
     }
-    saveData(appData);
     renderDocGrid();
     closeModal();
   });
@@ -1776,4 +1888,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAboutPopover();
   initDocViewer();
   installFileDropGuard();
+  if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
+    hydrateCatalogFromApi();
+  }
 });

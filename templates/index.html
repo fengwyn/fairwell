@@ -104,6 +104,7 @@
   <div class="section-header">
     <h2 class="section-title">Document Relationship Map</h2>
     <button class="add-doc-btn" onclick="openDocModal(-1)">+ Add Document</button>
+    <button class="toolbar-btn" onclick="openManageTypesModal()">Manage Types</button>
   </div>
   <p class="section-desc" data-section-desc="relationships">Documents that govern the FAIR process. Each has a distinct role, and they cross-reference each other extensively.</p>
   <div id="docGrid" class="doc-grid"></div>
@@ -367,6 +368,7 @@
 </div>
 
 <script src="{% static 'js/data.js' %}"></script>
+<script src="{% static 'js/documentsApi.js' %}"></script>
 <script src="{% static 'js/scripts.js' %}"></script>
 <script src="{% static 'js/reviewMode.js' %}"></script>
 <script src="{% static 'lib/pdfjs/pdf.js' %}"></script>

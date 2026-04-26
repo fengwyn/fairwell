@@ -95,4 +95,5 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'accounts.permissions.IsAuthenticatedAndSubscribed',
     ],
+    'EXCEPTION_HANDLER': 'fairwell_server.exception_handler.custom_exception_handler',
 }

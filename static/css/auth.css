@@ -55,6 +55,31 @@ body.auth-body::before {
               0 0 0 1px rgba(59,130,246,0.08) inset;
 }
 
+/* To enable a workshop / illustration background, uncomment this block and
+   swap the url() to the desired asset under static/. The overlays + frosted
+   card are tuned to keep the form readable on top of a busy image. */
+/*
+body.auth-body {
+  background-color: #0a0e17;
+  background-image:
+    radial-gradient(ellipse at 50% 100%, rgba(10,17,34,0.55) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(10,14,26,0.78) 0%, rgba(13,21,40,0.74) 45%, rgba(10,17,34,0.86) 100%),
+    url('../mascots/penguin_workshop.jpg');
+  background-size: cover, cover, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed, fixed, fixed;
+}
+.auth-card {
+  background: rgba(26, 34, 54, 0.86);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6),
+              0 8px 24px rgba(0,0,0,0.4),
+              0 0 0 1px rgba(59,130,246,0.12) inset;
+}
+*/
+
 .auth-eyebrow {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;

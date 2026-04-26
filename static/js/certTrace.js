@@ -4,9 +4,9 @@
 // page, and renders a radial link graph + per-document hit list.
 // State is session-only — nothing touches localStorage or the network.
 
-const PDFJS_WORKER_URL      = 'lib/pdfjs/pdf.worker.js';
-const PDFJS_CMAP_URL        = 'lib/pdfjs/cmaps/';
-const PDFJS_STANDARD_FONTS  = 'lib/pdfjs/standard_fonts/';
+const PDFJS_WORKER_URL      = '/static/lib/pdfjs/pdf.worker.js';
+const PDFJS_CMAP_URL        = '/static/lib/pdfjs/cmaps/';
+const PDFJS_STANDARD_FONTS  = '/static/lib/pdfjs/standard_fonts/';
 
 const certTraceState = {
   docs: [],           // { id, name, size, pageCount, textLayerPresent, indexing, error, pages }
