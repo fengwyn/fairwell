@@ -3,6 +3,15 @@
 
 let appData = loadData();
 
+// Documents are owned by /api/documents/, not localStorage. Discard any stale
+// doc list that may be in localStorage from a previous user on this browser
+// (e.g. a logout/login as a different account) so the SPA never renders docs
+// the current account doesn't own.
+
+if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
+  appData.documents = [];
+}
+
 // ────────────────────────── Navigation ──────────────────────────
 
 function showSection(id) {
@@ -876,6 +885,7 @@ function normalizeLocalPath(input) {
   let t = String(input).trim();
   if (!t || t === '#') return t;
 
+
   // Handle file:// URLs explicitly
   if (/^file:\/\//i.test(t)) {
     let pathPart = t.replace(/^file:\/\/\/?/i, '/');
@@ -885,10 +895,10 @@ function normalizeLocalPath(input) {
     return 'file://' + encodeFilePath(pathPart);
   }
 
-  // Other URLs (http, https, etc.)
+  // Other URLs (http, https, etc.) — also catches Windows drive letters (C:).
   if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
 
-  // Local path
+  // POSIX local path
   return 'file://' + encodeFilePath(safeDecodeURI(t));
 }
 

@@ -21,6 +21,14 @@ async function apiRequest(path, { method = 'GET', body = null } = {}) {
     init.body = JSON.stringify(body);
   }
   const resp = await fetch(path, init);
+  if (resp.status === 401) {
+    // Stale or invalid session (e.g. user was deleted, session cookie predates
+    // a logout). Bounce to login so the SPA self-heals instead of silently
+    // showing empty data.
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = '/login/?next=' + next;
+    throw new Error('not authenticated; redirecting to login');
+  }
   if (!resp.ok) {
     let detail = '';
     try { detail = await resp.text(); } catch (_) { /* swallow */ }

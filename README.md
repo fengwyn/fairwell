@@ -4,8 +4,6 @@ Fairwell <Version: Adelie 1.0>
 
 A lightweight, static front-end for documenting and navigating **First Article Inspection (FAI)** verification processes. FAIRWELL turns the web of governing documents, hierarchies, decision flows, and inspection forms into something you can click through instead of dig through PDFs for.
 
-It's a single HTML page with no build step and no server — open it in a browser and it works, including from the local filesystem.
-
 ## Purpose
 
 FAIs involve multiple overlapping documents (enterprise standards, supplements, operational procedures, AS9102 forms) that reference each other extensively. FAIRWELL lets a team capture that structure once and browse it interactively:
