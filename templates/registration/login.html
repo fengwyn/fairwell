@@ -33,5 +33,30 @@
   </form>
   <p class="auth-link">No account? <a href="{% url 'signup' %}">Sign up</a></p>
 </main>
+
+<!-- Grid -->
+<script>
+let mouseX = 50, mouseY = 50;
+
+document.addEventListener("mousemove", (e) => {
+  mouseX = (e.clientX / window.innerWidth) * 100;
+  mouseY = (e.clientY / window.innerHeight) * 100;
+});
+
+function animate() {
+  const currentX = parseFloat(getComputedStyle(document.body).getPropertyValue('--mouse-x')) || 50;
+  const currentY = parseFloat(getComputedStyle(document.body).getPropertyValue('--mouse-y')) || 50;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  document.body.style.setProperty('--mouse-x', `${lerp(currentX, mouseX, 0.1)}%`);
+  document.body.style.setProperty('--mouse-y', `${lerp(currentY, mouseY, 0.1)}%`);
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
 </body>
 </html>
