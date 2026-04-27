@@ -1,0 +1,48 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up · FAIRWELL</title>
+<link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+</head>
+<body class="auth-body">
+<main class="auth-card">
+  <div class="auth-eyebrow">FAIRWELL // Adelie 1.0</div>
+  <h1 class="auth-title">FAIR<strong>WELL</strong></h1>
+  <p class="auth-subtitle">Create an account to get started.</p>
+  <form method="post" class="auth-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <ul class="errorlist">{% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}</ul>
+    {% endif %}
+    <label class="auth-field">
+      <span>Username</span>
+      {{ form.username }}
+      {% if form.username.help_text %}<small class="helptext">{{ form.username.help_text }}</small>{% endif %}
+      {{ form.username.errors }}
+    </label>
+    <label class="auth-field">
+      <span>Email</span>
+      {{ form.email }}
+      {{ form.email.errors }}
+    </label>
+    <label class="auth-field">
+      <span>Password</span>
+      {{ form.password1 }}
+      {% if form.password1.help_text %}<small class="helptext">{{ form.password1.help_text|safe }}</small>{% endif %}
+      {{ form.password1.errors }}
+    </label>
+    <label class="auth-field">
+      <span>Confirm Password</span>
+      {{ form.password2 }}
+      {{ form.password2.errors }}
+    </label>
+    <button type="submit" class="auth-btn">Create Account</button>
+  </form>
+  <p class="auth-link">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,212 @@
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2236;
+  --border: #2a3654;
+  --border-glow: #3b82f6;
+  --text-primary: #e8edf5;
+  --text-secondary: #8b9dc3;
+  --text-muted: #5a6f94;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-rose: #f43f5e;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body.auth-body {
+  font-family: 'DM Sans', sans-serif;
+  background:
+    radial-gradient(ellipse at 30% 25%, rgba(59,130,246,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 75%, rgba(14,165,233,0.06) 0%, transparent 55%),
+    linear-gradient(180deg, #0a0e1a 0%, #0d1528 45%, #0a1122 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body.auth-body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(to right,  rgba(125,211,252,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(125,211,252,0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 40px 36px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4),
+              0 0 0 1px rgba(59,130,246,0.08) inset;
+}
+
+/* To enable a workshop / illustration background, uncomment this block and
+   swap the url() to the desired asset under static/. The overlays + frosted
+   card are tuned to keep the form readable on top of a busy image. */
+/*
+body.auth-body {
+  background-color: #0a0e17;
+  background-image:
+    radial-gradient(ellipse at 50% 100%, rgba(10,17,34,0.55) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(10,14,26,0.78) 0%, rgba(13,21,40,0.74) 45%, rgba(10,17,34,0.86) 100%),
+    url('../mascots/penguin_workshop.jpg');
+  background-size: cover, cover, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed, fixed, fixed;
+}
+.auth-card {
+  background: rgba(26, 34, 54, 0.86);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6),
+              0 8px 24px rgba(0,0,0,0.4),
+              0 0 0 1px rgba(59,130,246,0.12) inset;
+}
+*/
+
+.auth-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.auth-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.auth-title strong {
+  font-weight: 900;
+  background: linear-gradient(180deg, #f8fbff 0%, #9ec7f5 60%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left: 0.03em;
+}
+
+.auth-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field > span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.auth-field input {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+.auth-field ul.errorlist,
+.auth-field ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.auth-field .helptext {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.auth-error,
+.auth-field ul.errorlist li,
+.errorlist li {
+  color: var(--accent-rose);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.auth-btn {
+  margin-top: 8px;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 12px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.auth-btn:hover { background: #4f8df8; }
+.auth-btn:active { transform: translateY(1px); }
+
+.auth-link {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.auth-link a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.auth-link a:hover { text-decoration: underline; }

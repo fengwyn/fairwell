@@ -1,17 +1,17 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FAIRWELL</title>
-<link rel="icon" type="image/x-icon" href="favicon/favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
-<link rel="manifest" href="favicon/site.webmanifest">
+<link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon/favicon-32x32.png' %}">
+<link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon/favicon-16x16.png' %}">
+<link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
+<link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
-<link rel="stylesheet" href="css/artic.css">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<link rel="stylesheet" href="{% static 'css/artic.css' %}">
 </head>
 <body>
 
@@ -20,6 +20,10 @@
     <button class="toolbar-btn" onclick="handleLoadJson()">Load Data</button>
     <button class="toolbar-btn" onclick="handleExport()">Export Data</button>
     <button class="toolbar-btn" onclick="handleReset()">Reset to Defaults</button>
+    <form method="post" action="{% url 'logout' %}" style="display: contents">
+      {% csrf_token %}
+      <button type="submit" class="toolbar-btn" title="Signed in as {{ user.username }}">Logout</button>
+    </form>
   </div>
   <h1>FAIR<strong>WELL</strong></h1>
   <div class="subtitle"></div>
@@ -87,10 +91,10 @@
     </div>
 
     <div class="home-mascot" aria-hidden="true">
-      <img src="mascots/fairguin.png" alt="" class="home-mascot-img">
+      <img src="{% static 'mascots/fairguin.png' %}" alt="" class="home-mascot-img">
     </div>
     <div class="home-mascot home-mascot-2" aria-hidden="true">
-      <img src="mascots/fairguin_blueprint.png" alt="" class="home-mascot-img">
+      <img src="{% static 'mascots/fairguin_blueprint.png' %}" alt="" class="home-mascot-img">
     </div>
   </div>
 </div>
@@ -100,6 +104,7 @@
   <div class="section-header">
     <h2 class="section-title">Document Relationship Map</h2>
     <button class="add-doc-btn" onclick="openDocModal(-1)">+ Add Document</button>
+    <button class="toolbar-btn" onclick="openManageTypesModal()">Manage Types</button>
   </div>
   <p class="section-desc" data-section-desc="relationships">Documents that govern the FAIR process. Each has a distinct role, and they cross-reference each other extensively.</p>
   <div id="docGrid" class="doc-grid"></div>
@@ -111,7 +116,7 @@
     <h2 class="section-title">Document Hierarchy</h2>
     <button class="add-doc-btn" onclick="openHierLevelModal()">+ Add Level</button>
   </div>
-  <p class="section-desc" data-section-desc="hierarchy">COL-ASQR-PRO-0003 is the enterprise foundation. HSM17 and HSM19 supplement it for P&amp;C. HSM236 operationalizes all of them into the AS9102 FAI forms.</p>
+  <p class="section-desc" data-section-desc="hierarchy">Enter your enterprise foundation, supplements and operational documents in the FAI forms.</p>
   <div class="hierarchy" id="hierarchyContainer"></div>
 </div>
 
@@ -227,7 +232,7 @@
     <h2 class="section-title">Trace</h2>
     <button class="toolbar-btn" id="certClearBtn">Clear All</button>
   </div>
-  <p class="section-desc" data-section-desc="certtrace">Drop in PDFs (Form 1/2/3, PO, CoC, drawings, raw-material certs) and trace any part number, serial number, heat/lot, or spec across all of them. Files never leave your browser, they're parsed client-side with PDF.js.</p>
+  <p class="section-desc" data-section-desc="certtrace">Drop in PDFs (Form 1/2/3, PO, CoC, drawings, raw-material certs) and trace any part number, serial number, heat/lot, or spec across all of them. Files never leave your browser, they're parsed client-side.</p>
 
   <div class="cert-controls">
     <div class="cert-dropzone" id="certDropZone">
@@ -293,7 +298,7 @@
   </div>
 
   <figure class="construction-stage">
-    <img src="mascots/workshop.jpg" alt="Workshop full of penguins building tools and gadgets" class="construction-img">
+    <img src="{% static 'mascots/workshop.jpg' %}" alt="Workshop full of penguins building tools and gadgets" class="construction-img">
     <figcaption class="construction-caption">The Fairwell workshop, building the next batch of features.</figcaption>
   </figure>
 
@@ -362,10 +367,11 @@
   </div>
 </div>
 
-<script src="js/data.js"></script>
-<script src="js/scripts.js"></script>
-<script src="js/reviewMode.js"></script>
-<script src="lib/pdfjs/pdf.js"></script>
-<script src="js/certTrace.js"></script>
+<script src="{% static 'js/data.js' %}"></script>
+<script src="{% static 'js/documentsApi.js' %}"></script>
+<script src="{% static 'js/scripts.js' %}"></script>
+<script src="{% static 'js/reviewMode.js' %}"></script>
+<script src="{% static 'lib/pdfjs/pdf.js' %}"></script>
+<script src="{% static 'js/certTrace.js' %}"></script>
 </body>
 </html>
