@@ -20,11 +20,16 @@
     <button class="toolbar-btn" onclick="handleLoadJson()">Load Data</button>
     <button class="toolbar-btn" onclick="handleExport()">Export Data</button>
     <button class="toolbar-btn" onclick="handleReset()">Reset to Defaults</button>
+    <button class="toolbar-btn" id="cloudSyncToggle" onclick="toggleCloudSync()"
+            title="Cloud Sync stores your metadata in your FAIRWELL account so it follows you across devices. PDFs and Trace results NEVER leave your browser.">
+      &#9729; Cloud Sync: <span id="cloudSyncStatus">Off</span> <!-- Added Button for enabling Cloud Sync -->
+    </button>
     <form method="post" action="{% url 'logout' %}" style="display: contents">
       {% csrf_token %}
       <button type="submit" class="toolbar-btn" title="Signed in as {{ user.username }}">Logout</button>
     </form>
   </div>
+  <div class="cloud-sync-banner" id="cloudSyncBanner">Cloud Sync OFF &middot; all data stays in this browser</div>
   <h1>FAIR<strong>WELL</strong></h1>
   <div class="subtitle"></div>
   <div class="special-chars" id="specialCharsBar"></div>
@@ -59,7 +64,7 @@
 <div id="home" class="section active">
   <div class="home-layout">
     <div class="home-content">
-      <div class="home-eyebrow">FAIRWELL // Version: [Adelie 1.0]</div>
+      <div class="home-eyebrow">FAIRWELL // Version: Adelie 1.0 &ltDEVELOPMENT BUILD&gt </div>
       <div class="section-header">
         <h2 class="section-title">Home</h2>
       </div>
@@ -369,6 +374,7 @@
 
 <script src="{% static 'js/data.js' %}"></script>
 <script src="{% static 'js/documentsApi.js' %}"></script>
+<script src="{% static 'js/catalogApi.js' %}"></script>
 <script src="{% static 'js/scripts.js' %}"></script>
 <script src="{% static 'js/reviewMode.js' %}"></script>
 <script src="{% static 'lib/pdfjs/pdf.js' %}"></script>

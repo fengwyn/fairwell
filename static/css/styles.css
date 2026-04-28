@@ -1,3 +1,4 @@
+/* Used in both Light & Dark modes */
 :root {
   --bg-primary: #0a0e17;
   --bg-secondary: #111827;
@@ -692,6 +693,32 @@ body {
 }
 .add-doc-btn:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
 .toolbar-btn:hover { color: var(--text-primary); border-color: var(--accent-blue); }
+
+.toolbar-btn.cloud-sync-on {
+  color: var(--text-primary);
+  border-color: var(--accent-cyan, #06b6d4);
+  background: rgba(6, 182, 212, 0.10);
+}
+.toolbar-btn.cloud-sync-on:hover { border-color: var(--accent-cyan, #06b6d4); }
+
+.cloud-sync-banner {
+  position: absolute;
+  bottom: 64px;
+  right: 40px;
+  z-index: 2;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #5a6f94);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 4px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.cloud-sync-banner.cloud-sync-banner-on {
+  color: var(--accent-cyan, #06b6d4);
+  background: rgba(6, 182, 212, 0.10);
+}
 
 .section-toolbar {
   display: flex;

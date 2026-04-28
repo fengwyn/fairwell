@@ -1,4 +1,4 @@
-// FAIRWELL UI — rendering, navigation, modals, and CRUD.
+// FAIRWELL UI: rendering, navigation, modals, and CRUD.
 // Depends on data.js (SEED_DATA, loadData, saveData, etc.)
 
 let appData = loadData();
@@ -10,6 +10,13 @@ let appData = loadData();
 
 if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
   appData.documents = [];
+}
+
+// Same defense for the catalog kinds the API now owns. Each Phase 4 migration
+// adds its kind here so a previous user's localStorage can't bleed through.
+if (typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API) {
+  appData.reviewTurnbacks = [];
+  appData.reviewRefMeta = {};
 }
 
 // ────────────────────────── Navigation ──────────────────────────
@@ -70,27 +77,38 @@ async function deleteDocument(idx) {
       alert('Delete failed: ' + err.message);
       return;
     }
-    appData.documents.splice(idx, 1);
-  } else {
-    appData.documents.splice(idx, 1);
-    saveData(appData);
   }
+  appData.documents.splice(idx, 1);
+  saveData(appData);  // dual-write: local mirror after API or local-only edit
   renderDocGrid();
 }
 
 async function hydrateCatalogFromApi() {
   try {
-    const [colors, types, documents] = await Promise.all([
+    const useCatalog = typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API;
+    const promises = [
       apiFetchColors(),
       apiFetchTypes(),
       apiFetchDocuments(),
-    ]);
+    ];
+    if (useCatalog) promises.push(apiFetchCatalog());
+    const [colors, types, documents, catalog] = await Promise.all(promises);
     if (Array.isArray(colors) && colors.length) appData.colors = colors;
     if (Array.isArray(types) && types.length) appData.types = types;
     appData.documents = documents;
+    if (useCatalog && catalog && typeof catalog === 'object') {
+      if (Array.isArray(catalog.reviewTurnbacks)) appData.reviewTurnbacks = catalog.reviewTurnbacks;
+      if (catalog.reviewRefMeta && typeof catalog.reviewRefMeta === 'object') {
+        appData.reviewRefMeta = catalog.reviewRefMeta;
+      }
+    }
     applyCustomColors();
     if (typeof renderLegend === 'function') renderLegend();
     renderDocGrid();
+    if (typeof renderReviewMode === 'function') renderReviewMode();
+    // Mirror server state to localStorage so toggling Cloud Sync off later
+    // keeps the user's data instead of stranding them on stale local state.
+    saveData(appData);
   } catch (err) {
     console.error('Failed to hydrate catalog from API:', err);
   }
@@ -135,17 +153,18 @@ function openManageTypesModal() {
   };
 
   const wireRows = () => {
+    const useApi = typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API;
     document.querySelectorAll('.del-type-btn').forEach(btn => {
       btn.onclick = async () => {
         const slug = btn.dataset.slug;
         if (!confirm(`Delete type "${slug}"?`)) return;
-        try {
-          await apiDeleteType(slug);
-          appData.types = appData.types.filter(t => t.id !== slug);
-          refresh();
-        } catch (err) {
-          alert('Delete failed: ' + err.message);
+        if (useApi) {
+          try { await apiDeleteType(slug); }
+          catch (err) { alert('Delete failed: ' + err.message); return; }
         }
+        appData.types = appData.types.filter(t => t.id !== slug);
+        saveData(appData);
+        refresh();
       };
     });
     const addBtn = document.getElementById('addTypeBtn');
@@ -154,13 +173,20 @@ function openManageTypesModal() {
         const label = document.getElementById('newTypeLabel').value.trim();
         const colorId = document.getElementById('newTypeColor').value;
         if (!label) { alert('Label is required'); return; }
-        try {
-          const created = await apiCreateType({ label, colorId });
-          appData.types.push(created);
-          refresh();
-        } catch (err) {
-          alert('Add failed: ' + err.message);
+        let record;
+        if (useApi) {
+          try { record = await apiCreateType({ label, colorId }); }
+          catch (err) { alert('Add failed: ' + err.message); return; }
+        } else {
+          // Local-only: build a slug deterministically (mirrors backend _slugify).
+          const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 64) || 'type';
+          let slug = base, n = 2;
+          while (appData.types.some(t => t.id === slug)) { slug = `${base}-${n++}`; }
+          record = { id: slug, label, colorId };
         }
+        appData.types.push(record);
+        saveData(appData);
+        refresh();
       };
     }
   };
@@ -821,8 +847,8 @@ function openDocModal(idx) {
     } else {
       if (isEdit) appData.documents[idx] = updated;
       else appData.documents.push(updated);
-      saveData(appData);
     }
+    saveData(appData);  // dual-write: local mirror always
     renderDocGrid();
     closeModal();
   });
@@ -1443,7 +1469,13 @@ function handleExport() {
 let dataFileHandle = null;
 
 async function handleLoadJson() {
-  if (!confirm('Load a JSON data file? This replaces current content. If your browser supports it, future edits will save back to this file.')) return;
+  const useApi =
+    (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) ||
+    (typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API);
+  const confirmMsg = useApi
+    ? 'Load a JSON data file? This replaces your current data on the server. Future edits save automatically to your account.'
+    : 'Load a JSON data file? This replaces current content. If your browser supports it, future edits will save back to this file.';
+  if (!confirm(confirmMsg)) return;
   try {
     if (window.showOpenFilePicker) {
       const [handle] = await window.showOpenFilePicker({
@@ -1452,9 +1484,14 @@ async function handleLoadJson() {
       });
       const file = await handle.getFile();
       const parsed = JSON.parse(await file.text());
-      dataFileHandle = handle;
-      applyImportedData(parsed);
-      alert(`Loaded ${handle.name}. Future edits will save back to this file.`);
+      // The local-file write-back is meaningless once edits go to the API,
+      // so only bind the handle when we're staying in localStorage mode.
+      if (!useApi) dataFileHandle = handle;
+      const ok = await applyImportedData(parsed);
+      if (!ok) return;
+      alert(useApi
+        ? `Loaded ${handle.name} into your account. Future edits save to the server.`
+        : `Loaded ${handle.name}. Future edits will save back to this file.`);
       return;
     }
   } catch (err) {
@@ -1464,12 +1501,14 @@ async function handleLoadJson() {
   }
   // Fallback: read-only file picker (browsers without File System Access API)
   pickFile(async (file) => {
-    try {
-      applyImportedData(JSON.parse(await file.text()));
-      alert('Loaded (read-only — this browser cannot write back automatically; use Export JSON to save changes).');
-    } catch {
-      alert('Failed to parse selected file as JSON.');
-    }
+    let parsed;
+    try { parsed = JSON.parse(await file.text()); }
+    catch { alert('Failed to parse selected file as JSON.'); return; }
+    const ok = await applyImportedData(parsed);
+    if (!ok) return;
+    alert(useApi
+      ? 'Loaded into your account. Future edits save to the server.'
+      : 'Loaded (read-only — this browser cannot write back automatically; use Export JSON to save changes).');
   });
 }
 
@@ -1491,10 +1530,10 @@ async function writeToDataFile(jsonText) {
   }
 }
 
-function applyImportedData(imported) {
+async function applyImportedData(imported) {
   if (!imported || typeof imported !== 'object') {
     alert('Invalid data format.');
-    return;
+    return false;
   }
   if (!imported.colors) imported.colors = JSON.parse(JSON.stringify(SEED_COLORS));
   if (!imported.types) imported.types = JSON.parse(JSON.stringify(SEED_TYPES));
@@ -1507,11 +1546,76 @@ function applyImportedData(imported) {
   if (!Array.isArray(imported.reviewTurnbacks)) imported.reviewTurnbacks = [];
   if (!imported.reviewRefMeta || typeof imported.reviewRefMeta !== 'object') imported.reviewRefMeta = {};
   if (!Array.isArray(imported.specialChars)) imported.specialChars = JSON.parse(JSON.stringify(SEED_SPECIAL_CHARS));
+  if (!imported.descriptions || typeof imported.descriptions !== 'object') imported.descriptions = {};
   backfillDocTypes(imported);
+
+  const useDocsApi = typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API;
+  const useCatalogApi = typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API;
+
+  if (useDocsApi || useCatalogApi) {
+    try {
+      await pushImportedToApi(imported, useDocsApi, useCatalogApi);
+    } catch (err) {
+      alert(
+        'Import to server failed: ' + err.message +
+        '\n\nThe server may be in a partial state. Use Reset to Defaults to clear and try again.'
+      );
+      return false;
+    }
+    // Re-hydrate so local appData mirrors the canonical server state.
+    await hydrateCatalogFromApi();
+    renderAll();
+    closePanel();
+    return true;
+  }
+  // localStorage-only path (kept for when both API flags are off).
   appData = imported;
   saveData(appData);
   renderAll();
   closePanel();
+  return true;
+}
+
+// Replaces the user's server-side data with the import payload. Strategy is
+// destructive-replace, matching the "This replaces current content" confirm
+// shown in handleLoadJson — we delete what's there then create from scratch
+// rather than try to merge by slug.
+async function pushImportedToApi(imported, useDocsApi, useCatalogApi) {
+  if (useDocsApi) {
+    const [existingDocs, existingTypes, existingColors] = await Promise.all([
+      apiFetchDocuments(),
+      apiFetchTypes(),
+      apiFetchColors(),
+    ]);
+    // Docs reference type/color slugs as plain strings (no FK), so delete order
+    // is cosmetic. Delete docs first so a stale doc can't outlive its type.
+    await Promise.all((existingDocs || []).map(d => apiDeleteDocument(d.id)));
+    await Promise.all([
+      ...(existingTypes  || []).map(t => apiDeleteType(t.id)),
+      ...(existingColors || []).map(c => apiDeleteColor(c.id)),
+    ]);
+    // Create colors and types first so docs land in a populated palette.
+    await Promise.all([
+      ...(imported.colors || []).map(c => apiCreateColor(c)),
+      ...(imported.types  || []).map(t => apiCreateType(t)),
+    ]);
+    await Promise.all((imported.documents || []).map(d => apiCreateDocument(d)));
+  }
+  if (useCatalogApi) {
+    const catalogBody = {};
+    const kinds = [
+      'hierarchy', 'decisionFlow',
+      'form1Fields', 'form2Fields', 'form3Fields',
+      'reviewTurnbacks', 'reviewRefMeta',
+      'descriptions', 'specialChars',
+    ];
+    for (const k of kinds) {
+      if (imported[k] !== undefined) catalogBody[k] = imported[k];
+    }
+    if (Object.keys(catalogBody).length > 0) {
+      await apiPatchCatalog(catalogBody);
+    }
+  }
 }
 
 function handleReset() {
@@ -1520,6 +1624,98 @@ function handleReset() {
   appData = resetToDefaults();
   renderAll();
   closePanel();
+}
+
+// ────────────────────────── Cloud Sync toggle ──────────────────────────
+// The toggle persists in localStorage under 'fairwell_cloud_sync'. Both API
+// flag constants (USE_DOCUMENTS_API, USE_CATALOG_API) read it at script load,
+// so changing the toggle requires a page reload to take effect.
+
+function cloudSyncEnabled() {
+  return (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API)
+      || (typeof USE_CATALOG_API   !== 'undefined' && USE_CATALOG_API);
+}
+
+function countLocalItems() {
+  return (appData.documents      ? appData.documents.length      : 0)
+       + (appData.types          ? appData.types.length          : 0)
+       + (appData.colors         ? appData.colors.length         : 0)
+       + (appData.hierarchy      ? appData.hierarchy.length      : 0)
+       + (appData.decisionFlow   ? appData.decisionFlow.length   : 0)
+       + (appData.form1Fields    ? appData.form1Fields.length    : 0)
+       + (appData.form2Fields    ? appData.form2Fields.length    : 0)
+       + (appData.form3Fields    ? appData.form3Fields.length    : 0)
+       + (appData.reviewTurnbacks? appData.reviewTurnbacks.length: 0)
+       + Object.keys(appData.reviewRefMeta || {}).length;
+}
+
+async function toggleCloudSync() {
+  if (!cloudSyncEnabled()) {
+    // ── Enabling ──
+    const ok = confirm(
+      'Enable Cloud Sync?\n\n' +
+      '• Metadata (document cards, turnbacks, hierarchy, decision flow, forms, ' +
+      'reference metadata, descriptions, special chars) saves to your FAIRWELL ' +
+      'account so it follows you across devices.\n' +
+      '• PDFs and Trace results NEVER leave your browser.\n' +
+      '• Your local copy in this browser stays in sync.\n\n' +
+      'The page will reload.'
+    );
+    if (!ok) return;
+
+    // If the user has data locally, offer to push it up so they don't land on
+    // an empty server-side state after reload.
+    const n = countLocalItems();
+    if (n > 0) {
+      const upload = confirm(
+        `You have ${n} item(s) in this browser.\n\n` +
+        '[OK] Upload them to your account (recommended).\n' +
+        '[Cancel] Skip — keep server data as it is. (Your local data stays in this browser.)'
+      );
+      if (upload) {
+        try {
+          await pushImportedToApi(appData, true, true);
+        } catch (err) {
+          alert(
+            'Upload failed: ' + err.message +
+            '\n\nCloud Sync was NOT enabled. Try again, or use Reset to Defaults to clear and retry.'
+          );
+          return;
+        }
+      }
+    }
+
+    localStorage.setItem('fairwell_cloud_sync', 'true');
+    location.reload();
+  } else {
+    // ── Disabling ──
+    const ok = confirm(
+      'Disable Cloud Sync?\n\n' +
+      '• Future edits will only save in this browser.\n' +
+      '• Your data on the server is preserved and accessible if you re-enable Cloud Sync later.\n' +
+      '• Your current data is mirrored to this browser so you have continuity offline.\n\n' +
+      'The page will reload.'
+    );
+    if (!ok) return;
+    saveData(appData);  // one-shot mirror so localStorage isn't stale after reload
+    localStorage.setItem('fairwell_cloud_sync', 'false');
+    location.reload();
+  }
+}
+
+function updateCloudSyncDisplay() {
+  const status = document.getElementById('cloudSyncStatus');
+  const banner = document.getElementById('cloudSyncBanner');
+  const enabled = cloudSyncEnabled();
+  if (status) status.textContent = enabled ? 'On' : 'Off';
+  const btn = document.getElementById('cloudSyncToggle');
+  if (btn) btn.classList.toggle('cloud-sync-on', enabled);
+  if (banner) {
+    banner.textContent = enabled
+      ? 'Cloud Sync ON · syncing metadata to your account · PDFs never leave your browser'
+      : 'Cloud Sync OFF · all data stays in this browser';
+    banner.classList.toggle('cloud-sync-banner-on', enabled);
+  }
 }
 
 // ────────────────────────── Theme Toggle ──────────────────────────
@@ -1898,6 +2094,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAboutPopover();
   initDocViewer();
   installFileDropGuard();
+  updateCloudSyncDisplay();
   if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
     hydrateCatalogFromApi();
   }

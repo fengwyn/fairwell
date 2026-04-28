@@ -1,8 +1,12 @@
-// FAIRWELL — Document Map API client.
-// Phase 2: documents persist server-side. Flip USE_DOCUMENTS_API to false
-// to fall back to localStorage (kept wired during the transition).
+// FAIRWELL: Document Map API client.
+// Phase 2: Documents persist server-side. The flag is now driven by the user's
+// Cloud Sync toggle (localStorage key 'fairwell_cloud_sync'); default off, so
+// the SPA falls back to localStorage exactly like the original static build.
 
-const USE_DOCUMENTS_API = true;
+const USE_DOCUMENTS_API = (function () {
+  try { return localStorage.getItem('fairwell_cloud_sync') === 'true'; }
+  catch (_) { return false; }
+})();
 
 function getCsrfToken() {
   const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
