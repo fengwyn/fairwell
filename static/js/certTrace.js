@@ -17,11 +17,23 @@ const certTraceState = {
 };
 
 let certNextId = 1;
+// Shared PDF.js worker — created once on first parse and reused for every
+// subsequent getDocument() call. Without this, PDF.js spins up a new Worker
+// per file, and each constructor refetches /static/lib/pdfjs/pdf.worker.js
+// (304s, but still a round-trip per upload).
+let certPdfWorker = null;
 
 function certConfigurePdfJs() {
   if (typeof pdfjsLib === 'undefined') return false;
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+  }
+  if (!certPdfWorker && typeof pdfjsLib.PDFWorker === 'function') {
+    try {
+      certPdfWorker = new pdfjsLib.PDFWorker({ name: 'fairwell-cert-trace' });
+    } catch (_) {
+      certPdfWorker = null;
+    }
   }
   return true;
 }
@@ -126,12 +138,14 @@ async function addCertFiles(fileList) {
 
 async function indexCertPdf(file, doc) {
   const buf = await file.arrayBuffer();
-  const task = pdfjsLib.getDocument({
+  const params = {
     data: buf,
     cMapUrl: PDFJS_CMAP_URL,
     cMapPacked: true,
     standardFontDataUrl: PDFJS_STANDARD_FONTS
-  });
+  };
+  if (certPdfWorker) params.worker = certPdfWorker;
+  const task = pdfjsLib.getDocument(params);
   const pdf = await task.promise;
   doc.pageCount = pdf.numPages;
   const pages = [];
@@ -527,6 +541,9 @@ function renderCertResults() {
 function initCertTrace() {
   certBindControls();
   renderCertTrace();
+  // Warm the shared PDF.js worker now so the first file drop doesn't pay the
+  // worker-script fetch latency.
+  certConfigurePdfJs();
 }
 
 // Hook into the app's render cycle and run once on DOM ready (whichever fires
