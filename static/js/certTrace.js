@@ -1,4 +1,4 @@
-// FAIRWELL Cert Trace — client-side PDF cross-reference.
+// FAIRWELL Cert Trace; client-side PDF cross-reference.
 // Given a set of PDFs the user drops in and a subject to trace (part #,
 // serial #, heat/lot, spec, etc.), extracts text via PDF.js, searches every
 // page, and renders a radial link graph + per-document hit list.
@@ -7,6 +7,13 @@
 const PDFJS_WORKER_URL      = '/static/lib/pdfjs/pdf.worker.js';
 const PDFJS_CMAP_URL        = '/static/lib/pdfjs/cmaps/';
 const PDFJS_STANDARD_FONTS  = '/static/lib/pdfjs/standard_fonts/';
+
+// Tesseract.js — loaded lazily on first OCR run (user clicks "OCR" on a
+// scanned doc). Default points at unpkg; for fully offline / strict-CSP
+// deployments, vendor the dist files under /static/lib/tesseract/ and
+// swap the URL below.
+const TESSERACT_SRC = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
+const OCR_RENDER_SCALE = 2.0;  // Higher = sharper input for OCR, more memory.
 
 const certTraceState = {
   docs: [],           // { id, name, size, pageCount, textLayerPresent, indexing, error, pages }
@@ -22,6 +29,10 @@ let certNextId = 1;
 // per file, and each constructor refetches /static/lib/pdfjs/pdf.worker.js
 // (304s, but still a round-trip per upload).
 let certPdfWorker = null;
+// Lazy-loaded Tesseract.js script + shared OCR worker. Both stay alive for
+// the session once the user has run OCR at least once.
+let tesseractLoadPromise = null;
+let tesseractWorker = null;
 
 function certConfigurePdfJs() {
   if (typeof pdfjsLib === 'undefined') return false;
@@ -44,6 +55,88 @@ function certAttr(val) {
     .replace(/&/g, '&amp;')
     .replace(/'/g, '&#39;')
     .replace(/"/g, '&quot;');
+}
+
+// === OCR (Tesseract.js) ===
+
+function loadTesseract() {
+  if (typeof Tesseract !== 'undefined') return Promise.resolve();
+  if (tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = TESSERACT_SRC;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => {
+      tesseractLoadPromise = null;
+      reject(new Error('Failed to load Tesseract.js. Check your network connection (or vendor it locally — see TESSERACT_SRC).'));
+    };
+    document.head.appendChild(s);
+  });
+  return tesseractLoadPromise;
+}
+
+async function getTesseractWorker() {
+  if (tesseractWorker) return tesseractWorker;
+  await loadTesseract();
+  tesseractWorker = await Tesseract.createWorker('eng');
+  return tesseractWorker;
+}
+
+async function runCertOcr(docId) {
+  const doc = certTraceState.docs.find(d => d.id === docId);
+  if (!doc || !doc._file || doc.ocrInProgress) return;
+  if (!certConfigurePdfJs()) {
+    alert('PDF.js failed to load. Refresh the page and try again.');
+    return;
+  }
+  doc.ocrInProgress = true;
+  doc.ocrError = null;
+  doc.ocrProgress = 'loading…';
+  renderCertDocs();
+  try {
+    const worker = await getTesseractWorker();
+    const buf = await doc._file.arrayBuffer();
+    const params = {
+      data: buf,
+      cMapUrl: PDFJS_CMAP_URL,
+      cMapPacked: true,
+      standardFontDataUrl: PDFJS_STANDARD_FONTS,
+    };
+    if (certPdfWorker) params.worker = certPdfWorker;
+    const pdf = await pdfjsLib.getDocument(params).promise;
+    const ocrPages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      doc.ocrProgress = `${i}/${pdf.numPages}`;
+      renderCertDocs();
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: OCR_RENDER_SCALE });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const { data } = await worker.recognize(canvas);
+      const text = (data && data.text) ? data.text : '';
+      const confidence = (data && typeof data.confidence === 'number') ? data.confidence : 0;
+      ocrPages.push({ page: i, text, confidence });
+      // Free the canvas; high-DPI scans can be tens of MB each.
+      canvas.width = 0; canvas.height = 0;
+      await page.cleanup();
+    }
+    pdf.cleanup();
+    doc.pages = ocrPages;
+    doc.pageCount = ocrPages.length;
+    doc.textLayerPresent = ocrPages.some(p => (p.text || '').length > 30);
+    doc.ocr = true;
+  } catch (e) {
+    doc.ocrError = (e && e.message) ? e.message : 'OCR failed';
+  } finally {
+    doc.ocrInProgress = false;
+    doc.ocrProgress = null;
+    renderCertDocs();
+    if (certTraceState.term) runCertTrace();
+  }
 }
 
 // === INPUT ===
@@ -112,7 +205,8 @@ async function addCertFiles(fileList) {
       textLayerPresent: false,
       indexing: true,
       error: null,
-      pages: []
+      pages: [],
+      _file: file  // retained so OCR can re-render the same bytes later
     };
     certTraceState.docs.push(doc);
   }
@@ -225,11 +319,13 @@ function certSearchAll(term) {
       while (i < hay.length) {
         const found = hay.indexOf(needle, i);
         if (found < 0) break;
-        hits.push({
+        const hit = {
           page: p.page,
           pos: found,
           snippet: makeSnippet(raw, found, needle.length)
-        });
+        };
+        if (doc.ocr && typeof p.confidence === 'number') hit.confidence = p.confidence;
+        hits.push(hit);
         i = found + needle.length;
         if (hits.length > 500) break;
       }
@@ -273,13 +369,24 @@ function renderCertDocs() {
     let badge;
     if (d.indexing) {
       badge = `<span class="cert-doc-badge cert-doc-indexing">Parsing${d.pageCount ? ` ${d.pages.length}/${d.pageCount}` : '…'}</span>`;
+    } else if (d.ocrInProgress) {
+      badge = `<span class="cert-doc-badge cert-doc-ocr-progress">OCR ${d.ocrProgress || '…'}</span>`;
+    } else if (d.ocrError) {
+      badge = `<span class="cert-doc-badge cert-doc-error" title="${certAttr(d.ocrError)}">OCR error</span>`;
     } else if (d.error) {
       badge = `<span class="cert-doc-badge cert-doc-error" title="${certAttr(d.error)}">Error</span>`;
     } else if (!d.textLayerPresent) {
-      badge = `<span class="cert-doc-badge cert-doc-warn" title="PDF has no text layer — likely a scanned document. OCR is not supported in this version.">No text</span>`;
+      badge = `<span class="cert-doc-badge cert-doc-warn" title="PDF has no text layer — likely a scanned document. Click 'OCR' to extract text on-device (slow, ~10MB one-time download).">No text</span>`;
+    } else if (d.ocr) {
+      badge = `<span class="cert-doc-badge cert-doc-ocr" title="Text extracted via on-device OCR — accuracy varies by page">${d.pageCount}p OCR</span>`;
     } else {
       badge = `<span class="cert-doc-badge cert-doc-ok">${d.pageCount}p</span>`;
     }
+    const showOcrBtn = !d.indexing && !d.ocrInProgress && !d.error
+      && !d.textLayerPresent;
+    const ocrBtn = showOcrBtn
+      ? `<button class="icon-btn-sm cert-doc-ocr-btn" onclick="runCertOcr(${d.id})" title="Extract text from this scanned PDF using on-device OCR. Files never leave your browser.">OCR</button>`
+      : '';
     const labelChip = d.label
       ? `<span class="cert-label-chip" title="Temporary label — click the graph node to edit">${esc(d.label)}</span>`
       : '';
@@ -289,6 +396,7 @@ function renderCertDocs() {
         ${labelChip}
         <div class="cert-doc-right">
           ${badge}
+          ${ocrBtn}
           <button class="icon-btn-sm" onclick="openCertLabelModal(${d.id})" title="Set temporary label">&#9998;</button>
           <button class="icon-btn-sm delete-btn" onclick="removeCertDoc(${d.id})" title="Remove">×</button>
         </div>
@@ -375,10 +483,11 @@ function renderCertGraph() {
     const errored = node.status === 'error';
     const indexing = node.status === 'indexing';
     const noText = node.status === 'notext';
+    const ocrDoc = !!node.doc.ocr;
     const strength = hit ? 1 + Math.log(1 + node.hits.length) : 0;
     const strokeWidth = hit ? (1.5 + strength * 1.2) : 1.2;
     let stroke = 'var(--text-muted)';
-    if (hit) stroke = 'var(--accent-blue)';
+    if (hit) stroke = ocrDoc ? 'var(--accent-purple)' : 'var(--accent-blue)';
     else if (errored) stroke = 'var(--accent-rose)';
     else if (noText) stroke = 'var(--accent-amber)';
     else if (indexing) stroke = 'var(--accent-cyan)';
@@ -403,9 +512,13 @@ function renderCertGraph() {
     const hit = node.status === 'hit';
     const errored = node.status === 'error';
     const noText = node.status === 'notext';
+    const ocrDoc = !!node.doc.ocr;
     let fill = 'var(--bg-card)';
     let stroke = 'var(--border)';
-    if (hit) { fill = 'rgba(59,130,246,0.14)'; stroke = 'var(--accent-blue)'; }
+    if (hit) {
+      fill = ocrDoc ? 'rgba(139,92,246,0.14)' : 'rgba(59,130,246,0.14)';
+      stroke = ocrDoc ? 'var(--accent-purple)' : 'var(--accent-blue)';
+    }
     else if (errored) { fill = 'rgba(244,63,94,0.14)'; stroke = 'var(--accent-rose)'; }
     else if (noText) { fill = 'rgba(245,158,11,0.12)'; stroke = 'var(--accent-amber)'; }
     const displayName = node.doc.label || node.doc.name;
@@ -424,7 +537,7 @@ function renderCertGraph() {
       ? `${node.doc.label} — click to edit (file: ${node.doc.name})`
       : `${node.doc.name} — click to set a temporary label`;
     return `
-      <g class="cert-graph-node cert-graph-node-${node.status}">
+      <g class="cert-graph-node cert-graph-node-${node.status}${ocrDoc ? ' cert-graph-node-ocr' : ''}">
         <circle cx="${node.x}" cy="${node.y}" r="${nodeRadius}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
         <text x="${node.x}" y="${node.y + 5}" class="cert-node-count" text-anchor="middle">${countText}</text>
         <text x="${labelX}" y="${labelY}" class="cert-node-label ${node.doc.label ? 'cert-node-label-custom' : ''}" text-anchor="${textAnchor}" onclick="openCertLabelModal(${node.doc.id})"><title>${esc(labelTooltip)}</title>${esc(label)}</text>
@@ -472,6 +585,7 @@ function renderCertGraph() {
       <span class="cert-legend-item"><span class="cert-legend-swatch cert-legend-miss"></span> Missing</span>
       <span class="cert-legend-item"><span class="cert-legend-swatch cert-legend-notext"></span> No text layer</span>
       <span class="cert-legend-item"><span class="cert-legend-swatch cert-legend-err"></span> Error</span>
+      ${results.some(r => r.doc.ocr) ? '<span class="cert-legend-item"><span class="cert-legend-swatch cert-legend-ocr"></span> OCR-derived</span>' : ''}
     </div>
   `;
 }
@@ -503,14 +617,20 @@ function renderCertResults() {
                : r.status === 'notext' ? '⚠'
                : r.status === 'error' ? '!'
                : '…';
-    const cls = 'cert-result-' + r.status;
+    const cls = 'cert-result-' + r.status + (r.doc.ocr ? ' cert-result-ocr' : '');
     const hitsShown = r.hits.slice(0, 6);
-    const hitsHtml = hitsShown.map(h => `
-      <div class="cert-hit">
-        <span class="cert-hit-page">p.${h.page}</span>
-        <span class="cert-hit-text">${esc(h.snippet.pre)}<mark>${esc(h.snippet.mid)}</mark>${esc(h.snippet.post)}</span>
-      </div>
-    `).join('');
+    const hitsHtml = hitsShown.map(h => {
+      const conf = (typeof h.confidence === 'number')
+        ? `<span class="cert-hit-conf" title="OCR confidence on page ${h.page}">${Math.round(h.confidence)}%</span>`
+        : '';
+      return `
+        <div class="cert-hit">
+          <span class="cert-hit-page">p.${h.page}</span>
+          ${conf}
+          <span class="cert-hit-text">${esc(h.snippet.pre)}<mark>${esc(h.snippet.mid)}</mark>${esc(h.snippet.post)}</span>
+        </div>
+      `;
+    }).join('');
     const moreHits = r.hits.length > hitsShown.length
       ? `<div class="cert-hit-more">… and ${r.hits.length - hitsShown.length} more hit${r.hits.length - hitsShown.length === 1 ? '' : 's'}</div>`
       : '';
@@ -521,11 +641,15 @@ function renderCertResults() {
     const labelChip = r.doc.label
       ? `<span class="cert-label-chip" title="Temporary label">${esc(r.doc.label)}</span>`
       : '';
+    const ocrTag = r.doc.ocr
+      ? `<span class="cert-ocr-tag" title="Text extracted via on-device OCR">OCR</span>`
+      : '';
     return `
       <div class="cert-result-row ${cls}">
         <div class="cert-result-head">
           <span class="cert-result-icon">${icon}</span>
           <span class="cert-result-name">${esc(r.doc.name)}</span>
+          ${ocrTag}
           ${labelChip}
           <span class="cert-result-count">${r.hits.length} hit${r.hits.length === 1 ? '' : 's'}</span>
         </div>

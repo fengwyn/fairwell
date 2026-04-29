@@ -1,4 +1,4 @@
-/* Used in both Light & Dark modes */
+/* Used in both Light & Dark modes; Soft Sky Light Mode, Abyss Dark Blue */
 :root {
   --bg-primary: #0a0e17;
   --bg-secondary: #111827;
@@ -2696,6 +2696,27 @@ select.modal-input {
 .cert-doc-indexing { color: var(--accent-cyan); }
 .cert-doc-warn { color: var(--accent-amber); }
 .cert-doc-error { color: var(--accent-rose); }
+.cert-doc-ocr { color: var(--accent-purple); }
+.cert-doc-ocr-progress {
+  color: var(--accent-cyan);
+  animation: cert-ocr-pulse 1.4s ease-in-out infinite;
+}
+@keyframes cert-ocr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.cert-doc-ocr-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--accent-purple);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+.cert-doc-ocr-btn:hover {
+  color: var(--text-primary);
+  background: rgba(139, 92, 246, 0.14);
+  border-color: var(--accent-purple);
+}
 
 /* Graph */
 .cert-graph {
@@ -2764,6 +2785,7 @@ select.modal-input {
 .cert-graph-node-error .cert-node-count { fill: var(--accent-rose); }
 .cert-graph-node-notext .cert-node-count { fill: var(--accent-amber); }
 .cert-graph-node-indexing .cert-node-count { fill: var(--accent-cyan); }
+.cert-graph-node-ocr .cert-node-count { fill: var(--accent-purple); }
 .cert-node-label {
   font-family: 'DM Sans', sans-serif;
   font-size: 0.72rem;
@@ -2825,6 +2847,7 @@ select.modal-input {
 }
 .cert-legend-notext { background: var(--accent-amber); }
 .cert-legend-err { background: var(--accent-rose); }
+.cert-legend-ocr { background: var(--accent-purple); }
 
 /* Results */
 .cert-results-pane {
@@ -2877,6 +2900,32 @@ select.modal-input {
 .cert-result-notext .cert-result-icon { color: var(--accent-amber); background: rgba(245,158,11,0.12); }
 .cert-result-error .cert-result-icon { color: var(--accent-rose); background: rgba(244,63,94,0.18); }
 .cert-result-indexing .cert-result-icon { color: var(--accent-cyan); background: rgba(6,182,212,0.12); }
+.cert-result-ocr.cert-result-hit .cert-result-icon {
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.14);
+}
+.cert-ocr-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.10);
+  border: 1px solid rgba(139, 92, 246, 0.34);
+  flex-shrink: 0;
+}
+.cert-hit-conf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.10);
+  border: 1px solid rgba(139, 92, 246, 0.32);
+  flex-shrink: 0;
+}
 .cert-result-name {
   flex: 1;
   min-width: 0;
