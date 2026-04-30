@@ -16,11 +16,12 @@ const TESSERACT_SRC = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
 const OCR_RENDER_SCALE = 2.0;  // Higher = sharper input for OCR, more memory.
 
 const certTraceState = {
-  docs: [],           // { id, name, size, pageCount, textLayerPresent, indexing, error, pages }
+  docs: [],           // { id, name, size, pageCount, textLayerPresent, indexing, error, pages, group, label }
   term: '',
   caseSensitive: false,
   looseNumeric: false,
-  results: null       // [{ doc, hits, status }]
+  results: null,      // [{ doc, hits, status }]
+  activeGroup: null   // null = scan all docs; '' = only ungrouped; 'X' = only docs with group === 'X'
 };
 
 let certNextId = 1;
@@ -206,7 +207,8 @@ async function addCertFiles(fileList) {
       indexing: true,
       error: null,
       pages: [],
-      _file: file  // retained so OCR can re-render the same bytes later
+      group: '',     // empty = ungrouped; user assigns via the per-doc settings modal
+      _file: file    // retained so OCR can re-render the same bytes later
     };
     certTraceState.docs.push(doc);
   }
@@ -285,12 +287,23 @@ function runCertTrace() {
   const term = termInput ? termInput.value.trim() : '';
   if (!term) { alert('Enter a subject to trace first.'); return; }
   if (!certTraceState.docs.length) { alert('Add at least one PDF first.'); return; }
+  if (!activeCertDocs().length) {
+    alert('No documents in the selected group — switch to "All" or pick a group with files in it.');
+    return;
+  }
   certTraceState.term = term;
   certTraceState.caseSensitive = !!(csEl && csEl.checked);
   certTraceState.looseNumeric = !!(lnEl && lnEl.checked);
   certTraceState.results = certSearchAll(term);
   renderCertGraph();
   renderCertResults();
+}
+
+// Docs included in the current trace, filtered by activeGroup. null = all.
+function activeCertDocs() {
+  const g = certTraceState.activeGroup;
+  if (g === null || g === undefined) return certTraceState.docs;
+  return certTraceState.docs.filter(d => (d.group || '') === g);
 }
 
 function certNormalize(s, caseSensitive, loose) {
@@ -307,7 +320,7 @@ function certNormalize(s, caseSensitive, loose) {
 function certSearchAll(term) {
   const results = [];
   const needle = certNormalize(term, certTraceState.caseSensitive, certTraceState.looseNumeric);
-  for (const doc of certTraceState.docs) {
+  for (const doc of activeCertDocs()) {
     if (doc.indexing) { results.push({ doc, hits: [], status: 'indexing' }); continue; }
     if (doc.error) { results.push({ doc, hits: [], status: 'error' }); continue; }
     if (!doc.textLayerPresent) { results.push({ doc, hits: [], status: 'notext' }); continue; }
@@ -354,18 +367,28 @@ function renderCertTrace() {
 }
 
 function renderCertDocs() {
+  renderCertDocsFilter();
   const list = document.getElementById('certDocsList');
   const countEl = document.getElementById('certDocsCount');
   if (!list) return;
-  const docs = certTraceState.docs;
-  if (countEl) countEl.textContent = String(docs.length).padStart(2, '0');
+  const allDocs = certTraceState.docs;
+  // Header count always reflects total — the filter chips communicate scope.
+  if (countEl) countEl.textContent = String(allDocs.length).padStart(2, '0');
 
-  if (!docs.length) {
+  if (!allDocs.length) {
     list.innerHTML = `<div class="cert-docs-empty">No documents yet. Drop PDFs above to begin.</div>`;
     return;
   }
 
-  list.innerHTML = docs.map(d => {
+  const visible = activeCertDocs();
+  if (!visible.length) {
+    const g = certTraceState.activeGroup;
+    const label = g === '' ? 'Ungrouped' : `"${g}"`;
+    list.innerHTML = `<div class="cert-docs-empty">No documents in ${label}. Pick another group above, or assign one of your files to it via the &#9998; button.</div>`;
+    return;
+  }
+
+  list.innerHTML = visible.map(d => {
     let badge;
     if (d.indexing) {
       badge = `<span class="cert-doc-badge cert-doc-indexing">Parsing${d.pageCount ? ` ${d.pages.length}/${d.pageCount}` : '…'}</span>`;
@@ -382,22 +405,31 @@ function renderCertDocs() {
     } else {
       badge = `<span class="cert-doc-badge cert-doc-ok">${d.pageCount}p</span>`;
     }
-    const showOcrBtn = !d.indexing && !d.ocrInProgress && !d.error
-      && !d.textLayerPresent;
+    // OCR is now offered on every parseable doc — even ones with a text layer,
+    // since some "text" PDFs are partially raster (mixed digital + scanned).
+    // Hidden once the doc is already OCR'd, busy, or errored.
+    const showOcrBtn = !d.indexing && !d.ocrInProgress && !d.error && !d.ocr;
+    const ocrTitle = d.textLayerPresent
+      ? 'Re-extract this PDF via on-device OCR. Useful for partially scanned PDFs whose text layer is incomplete. Files never leave your browser.'
+      : 'Extract text from this scanned PDF using on-device OCR. Files never leave your browser.';
     const ocrBtn = showOcrBtn
-      ? `<button class="icon-btn-sm cert-doc-ocr-btn" onclick="runCertOcr(${d.id})" title="Extract text from this scanned PDF using on-device OCR. Files never leave your browser.">OCR</button>`
+      ? `<button class="icon-btn-sm cert-doc-ocr-btn" onclick="runCertOcr(${d.id})" title="${certAttr(ocrTitle)}">OCR</button>`
       : '';
     const labelChip = d.label
       ? `<span class="cert-label-chip" title="Temporary label — click the graph node to edit">${esc(d.label)}</span>`
+      : '';
+    const groupChip = d.group
+      ? `<span class="cert-doc-group-tag" title="Group: ${certAttr(d.group)}">${esc(d.group)}</span>`
       : '';
     return `
       <div class="cert-doc-row">
         <div class="cert-doc-name" title="${certAttr(d.name)}">${esc(d.name)}</div>
         ${labelChip}
+        ${groupChip}
         <div class="cert-doc-right">
           ${badge}
           ${ocrBtn}
-          <button class="icon-btn-sm" onclick="openCertLabelModal(${d.id})" title="Set temporary label">&#9998;</button>
+          <button class="icon-btn-sm" onclick="openCertLabelModal(${d.id})" title="Edit label and group">&#9998;</button>
           <button class="icon-btn-sm delete-btn" onclick="removeCertDoc(${d.id})" title="Remove">×</button>
         </div>
       </div>
@@ -405,11 +437,68 @@ function renderCertDocs() {
   }).join('');
 }
 
+// Render the group filter chipset above the docs list. Only appears when
+// at least one named group is in use; if all docs share no group, the
+// chipset would be redundant.
+function renderCertDocsFilter() {
+  const root = document.getElementById('certDocsFilter');
+  if (!root) return;
+  const groups = new Set();
+  let hasUngrouped = false;
+  certTraceState.docs.forEach(d => {
+    if (d.group) groups.add(d.group);
+    else hasUngrouped = true;
+  });
+  const sorted = Array.from(groups).sort((a, b) => a.localeCompare(b));
+
+  // No named groups → no filter UI; reset any stale activeGroup.
+  if (!sorted.length) {
+    certTraceState.activeGroup = null;
+    root.innerHTML = '';
+    return;
+  }
+
+  // Collapse activeGroup back to All if it points at a vanished group.
+  const g = certTraceState.activeGroup;
+  if (g !== null && g !== '' && !groups.has(g)) {
+    certTraceState.activeGroup = null;
+  }
+  if (g === '' && !hasUngrouped) certTraceState.activeGroup = null;
+
+  const active = certTraceState.activeGroup;
+  const chip = (label, value, isActive) =>
+    `<button class="cert-group-chip${isActive ? ' active' : ''}" data-grp="${certAttr(value)}">${esc(label)}</button>`;
+  const chips = [
+    chip('All', '__all__', active === null),
+    ...sorted.map(name => chip(name, name, active === name)),
+  ];
+  if (hasUngrouped) chips.push(chip('Ungrouped', '__none__', active === ''));
+  root.innerHTML = chips.join('');
+  root.querySelectorAll('.cert-group-chip').forEach(btn => {
+    btn.onclick = () => {
+      const v = btn.dataset.grp;
+      if (v === '__all__') certTraceState.activeGroup = null;
+      else if (v === '__none__') certTraceState.activeGroup = '';
+      else certTraceState.activeGroup = v;
+      renderCertDocs();
+      if (certTraceState.term) runCertTrace();
+    };
+  });
+}
+
 function openCertLabelModal(docId) {
   const doc = certTraceState.docs.find(d => d.id === docId);
   if (!doc) return;
+  // Suggest existing groups so the user can quickly reuse one rather than
+  // re-typing — typos would split the same intended group across two chips.
+  const existingGroups = Array.from(new Set(
+    certTraceState.docs.map(d => d.group).filter(Boolean)
+  )).sort();
+  const groupOpts = existingGroups.map(g =>
+    `<option value="${certAttr(g)}"></option>`
+  ).join('');
   const body = `
-    <div style="margin-bottom:10px;">
+    <div style="margin-bottom:14px;">
       <label class="review-section-label" style="margin-bottom:6px; display:block;">Label for
         <span style="color:var(--text-primary); font-weight:600;">${esc(doc.name)}</span>
       </label>
@@ -418,18 +507,33 @@ function openCertLabelModal(docId) {
              placeholder="e.g. Form 1, PO, CoC — leave empty to keep the file name"
              maxlength="60" autocomplete="off">
       <div class="modal-hint" style="margin-top:8px;">
-        This is a temporary display label shown in the Link Graph and next to the file name in Hits. It does not rename the file, and it is only kept for this session.
+        Display label shown in the Link Graph and next to the file name in Hits. Doesn't rename the file. Session-only.
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label class="review-section-label" style="margin-bottom:6px; display:block;">Group</label>
+      <input type="text" class="modal-input" id="certGroupInput"
+             list="certGroupSuggestions"
+             value="${certAttr(doc.group || '')}"
+             placeholder="e.g. FAIR Packet 1, Drawings, Material Certs — leave empty for ungrouped"
+             maxlength="40" autocomplete="off">
+      <datalist id="certGroupSuggestions">${groupOpts}</datalist>
+      <div class="modal-hint" style="margin-top:8px;">
+        Groups let you trace a subset of documents at a time. Pick one from the chips above the file list to scope the next trace.
       </div>
     </div>
   `;
-  openModal(`Set Label`, body, () => {
-    const val = document.getElementById('certLabelInput').value.trim();
-    if (val) doc.label = val;
-    else delete doc.label;
+  openModal(`Document Settings`, body, () => {
+    const labelVal = document.getElementById('certLabelInput').value.trim();
+    const groupVal = document.getElementById('certGroupInput').value.trim();
+    if (labelVal) doc.label = labelVal; else delete doc.label;
+    doc.group = groupVal;
     renderCertDocs();
     if (certTraceState.results) {
-      renderCertGraph();
-      renderCertResults();
+      // Group change can shift which docs are in scope — re-run search if
+      // a term is active so results stay coherent with the chip selection.
+      if (certTraceState.term) runCertTrace();
+      else { renderCertGraph(); renderCertResults(); }
     }
     closeModal();
   });
