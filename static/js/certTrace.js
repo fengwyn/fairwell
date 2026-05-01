@@ -2,7 +2,10 @@
 // Given a set of PDFs the user drops in and a subject to trace (part #,
 // serial #, heat/lot, spec, etc.), extracts text via PDF.js, searches every
 // page, and renders a radial link graph + per-document hit list.
+// Able to search via groups
 // State is session-only — nothing touches localStorage or the network.
+
+
 
 const PDFJS_WORKER_URL      = '/static/lib/pdfjs/pdf.worker.js';
 const PDFJS_CMAP_URL        = '/static/lib/pdfjs/cmaps/';
@@ -17,12 +20,15 @@ const OCR_RENDER_SCALE = 2.0;  // Higher = sharper input for OCR, more memory.
 
 const certTraceState = {
   docs: [],           // { id, name, size, pageCount, textLayerPresent, indexing, error, pages, group, label }
+  groups: [],         // [{ name, color }] — pre-created and named via the "+ Add Group" chip
   term: '',
   caseSensitive: false,
   looseNumeric: false,
   results: null,      // [{ doc, hits, status }]
   activeGroup: null   // null = scan all docs; '' = only ungrouped; 'X' = only docs with group === 'X'
 };
+
+const CERT_DEFAULT_GROUP_COLOR = '#06b6d4';  // matches --accent-cyan
 
 let certNextId = 1;
 // Shared PDF.js worker — created once on first parse and reused for every
@@ -197,6 +203,12 @@ async function addCertFiles(fileList) {
   });
   if (!files.length) return;
 
+  // Drops while a named group is selected auto-join that group, so the user
+  // can pre-create groups and bulk-assign by switching chips before dropping.
+  const activeIsNamed = typeof certTraceState.activeGroup === 'string'
+    && certTraceState.activeGroup !== '';
+  const initGroup = activeIsNamed ? certTraceState.activeGroup : '';
+
   for (const file of files) {
     const doc = {
       id: certNextId++,
@@ -207,7 +219,7 @@ async function addCertFiles(fileList) {
       indexing: true,
       error: null,
       pages: [],
-      group: '',     // empty = ungrouped; user assigns via the per-doc settings modal
+      group: initGroup,
       _file: file    // retained so OCR can re-render the same bytes later
     };
     certTraceState.docs.push(doc);
@@ -418,8 +430,11 @@ function renderCertDocs() {
     const labelChip = d.label
       ? `<span class="cert-label-chip" title="Temporary label — click the graph node to edit">${esc(d.label)}</span>`
       : '';
+    const groupColor = d.group
+      ? ((certTraceState.groups.find(g => g.name === d.group) || {}).color || CERT_DEFAULT_GROUP_COLOR)
+      : '';
     const groupChip = d.group
-      ? `<span class="cert-doc-group-tag" title="Group: ${certAttr(d.group)}">${esc(d.group)}</span>`
+      ? `<span class="cert-doc-group-tag" style="--group-color: ${certAttr(groupColor)}" title="Group: ${certAttr(d.group)}">${esc(d.group)}</span>`
       : '';
     return `
       <div class="cert-doc-row">
@@ -437,45 +452,68 @@ function renderCertDocs() {
   }).join('');
 }
 
-// Render the group filter chipset above the docs list. Only appears when
-// at least one named group is in use; if all docs share no group, the
-// chipset would be redundant.
+// Render the group filter chipset above the docs list. The "+ Add Group"
+// button is always visible so the user can pre-create groups before any
+// docs are dropped — selecting a group then dropping files auto-assigns
+// them to that group.
 function renderCertDocsFilter() {
   const root = document.getElementById('certDocsFilter');
   if (!root) return;
-  const groups = new Set();
-  let hasUngrouped = false;
+  const groups = certTraceState.groups || [];
+  const groupNames = new Set(groups.map(g => g.name));
+
+  // Self-heal: a doc carrying a group name with no entry in `groups`
+  // (e.g. older session state, or a stale name) gets its group resurrected
+  // with the default cyan so the chip and tag stay coherent.
   certTraceState.docs.forEach(d => {
-    if (d.group) groups.add(d.group);
-    else hasUngrouped = true;
+    if (d.group && !groupNames.has(d.group)) {
+      const restored = { name: d.group, color: CERT_DEFAULT_GROUP_COLOR };
+      certTraceState.groups.push(restored);
+      groupNames.add(restored.name);
+    }
   });
-  const sorted = Array.from(groups).sort((a, b) => a.localeCompare(b));
 
-  // No named groups → no filter UI; reset any stale activeGroup.
-  if (!sorted.length) {
-    certTraceState.activeGroup = null;
-    root.innerHTML = '';
-    return;
+  let hasUngrouped = false;
+  certTraceState.docs.forEach(d => { if (!d.group) hasUngrouped = true; });
+
+  // Reset stale activeGroup before rendering so the active chip never
+  // points at a group that no longer exists.
+  const cur = certTraceState.activeGroup;
+  if (cur !== null) {
+    if (cur === '') {
+      if (!hasUngrouped && certTraceState.docs.length > 0) certTraceState.activeGroup = null;
+    } else if (!groupNames.has(cur)) {
+      certTraceState.activeGroup = null;
+    }
   }
-
-  // Collapse activeGroup back to All if it points at a vanished group.
-  const g = certTraceState.activeGroup;
-  if (g !== null && g !== '' && !groups.has(g)) {
-    certTraceState.activeGroup = null;
-  }
-  if (g === '' && !hasUngrouped) certTraceState.activeGroup = null;
-
   const active = certTraceState.activeGroup;
-  const chip = (label, value, isActive) =>
-    `<button class="cert-group-chip${isActive ? ' active' : ''}" data-grp="${certAttr(value)}">${esc(label)}</button>`;
-  const chips = [
-    chip('All', '__all__', active === null),
-    ...sorted.map(name => chip(name, name, active === name)),
-  ];
-  if (hasUngrouped) chips.push(chip('Ungrouped', '__none__', active === ''));
+
+  const chips = [];
+  if (groups.length > 0) {
+    chips.push(`<button class="cert-group-chip cert-group-chip-all${active === null ? ' active' : ''}" data-grp="__all__">All</button>`);
+    for (const g of groups) {
+      const color = g.color || CERT_DEFAULT_GROUP_COLOR;
+      const isActive = active === g.name;
+      chips.push(
+        `<span class="cert-group-chip-wrap" style="--group-color: ${certAttr(color)}">`
+        + `<button class="cert-group-chip cert-group-chip-named${isActive ? ' active' : ''}" data-grp="${certAttr(g.name)}">`
+        + `<span class="cert-group-chip-dot"></span>${esc(g.name)}`
+        + `</button>`
+        + `<button class="cert-group-chip-del" data-grp-del="${certAttr(g.name)}" title="Delete group">&times;</button>`
+        + `</span>`
+      );
+    }
+    if (hasUngrouped) {
+      chips.push(`<button class="cert-group-chip${active === '' ? ' active' : ''}" data-grp="__none__">Ungrouped</button>`);
+    }
+  }
+  chips.push(`<button class="cert-group-chip cert-group-chip-add" id="certAddGroupBtn" title="Create a new group. PDFs dropped while it's selected will join it automatically.">+ Add Group</button>`);
+
   root.innerHTML = chips.join('');
-  root.querySelectorAll('.cert-group-chip').forEach(btn => {
-    btn.onclick = () => {
+
+  root.querySelectorAll('.cert-group-chip[data-grp]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
       const v = btn.dataset.grp;
       if (v === '__all__') certTraceState.activeGroup = null;
       else if (v === '__none__') certTraceState.activeGroup = '';
@@ -484,6 +522,64 @@ function renderCertDocsFilter() {
       if (certTraceState.term) runCertTrace();
     };
   });
+  root.querySelectorAll('.cert-group-chip-del').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      deleteCertGroup(btn.dataset.grpDel);
+    };
+  });
+  const addBtn = root.querySelector('#certAddGroupBtn');
+  if (addBtn) addBtn.onclick = () => openCertAddGroupModal();
+}
+
+function openCertAddGroupModal() {
+  const body = `
+    <div style="margin-bottom:14px;">
+      <label class="review-section-label" style="margin-bottom:6px; display:block;">Group name</label>
+      <input type="text" class="modal-input" id="certNewGroupName"
+             maxlength="40" autocomplete="off"
+             placeholder="e.g. FAIR Packet 1, Drawings, Material Certs">
+    </div>
+    <div style="margin-bottom:6px;">
+      <label class="review-section-label" style="margin-bottom:6px; display:block;">Color</label>
+      <input type="color" class="cert-color-input" id="certNewGroupColor" value="${CERT_DEFAULT_GROUP_COLOR}">
+      <div class="modal-hint" style="margin-top:8px;">
+        Used as the group chip and per-file tag color. Default cyan if you don't change it.
+        After saving, the group becomes selected — drop files and they'll automatically join this group.
+      </div>
+    </div>
+  `;
+  openModal('Add Group', body, () => {
+    const name = document.getElementById('certNewGroupName').value.trim();
+    const color = document.getElementById('certNewGroupColor').value || CERT_DEFAULT_GROUP_COLOR;
+    if (!name) { alert('Group name is required.'); return; }
+    if (certTraceState.groups.some(g => g.name === name)) {
+      alert('A group with that name already exists.');
+      return;
+    }
+    certTraceState.groups.push({ name, color });
+    certTraceState.activeGroup = name;
+    renderCertDocs();
+    closeModal();
+  });
+  setTimeout(() => {
+    const inp = document.getElementById('certNewGroupName');
+    if (inp) inp.focus();
+  }, 0);
+}
+
+function deleteCertGroup(name) {
+  if (!name) return;
+  const docsInGroup = certTraceState.docs.filter(d => d.group === name).length;
+  const msg = docsInGroup
+    ? `Delete group "${name}"? Its ${docsInGroup} document${docsInGroup === 1 ? '' : 's'} will become Ungrouped (the files themselves stay).`
+    : `Delete group "${name}"?`;
+  if (!confirm(msg)) return;
+  certTraceState.groups = certTraceState.groups.filter(g => g.name !== name);
+  certTraceState.docs.forEach(d => { if (d.group === name) d.group = ''; });
+  if (certTraceState.activeGroup === name) certTraceState.activeGroup = null;
+  renderCertDocs();
+  if (certTraceState.term) runCertTrace();
 }
 
 function openCertLabelModal(docId) {
@@ -491,9 +587,10 @@ function openCertLabelModal(docId) {
   if (!doc) return;
   // Suggest existing groups so the user can quickly reuse one rather than
   // re-typing — typos would split the same intended group across two chips.
-  const existingGroups = Array.from(new Set(
-    certTraceState.docs.map(d => d.group).filter(Boolean)
-  )).sort();
+  const existingGroups = Array.from(new Set([
+    ...certTraceState.groups.map(g => g.name),
+    ...certTraceState.docs.map(d => d.group).filter(Boolean),
+  ])).sort();
   const groupOpts = existingGroups.map(g =>
     `<option value="${certAttr(g)}"></option>`
   ).join('');
@@ -527,6 +624,12 @@ function openCertLabelModal(docId) {
     const labelVal = document.getElementById('certLabelInput').value.trim();
     const groupVal = document.getElementById('certGroupInput').value.trim();
     if (labelVal) doc.label = labelVal; else delete doc.label;
+    // Auto-register a typed-but-unknown group name with the default cyan
+    // color, so the chip and per-doc tag stay in sync. Use Add Group for
+    // a custom color.
+    if (groupVal && !certTraceState.groups.some(g => g.name === groupVal)) {
+      certTraceState.groups.push({ name: groupVal, color: CERT_DEFAULT_GROUP_COLOR });
+    }
     doc.group = groupVal;
     renderCertDocs();
     if (certTraceState.results) {

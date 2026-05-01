@@ -22,7 +22,7 @@
     <button class="toolbar-btn" onclick="handleReset()">Reset to Defaults</button>
     <button class="toolbar-btn" id="cloudSyncToggle" onclick="toggleCloudSync()"
             title="Cloud Sync stores your metadata in your FAIRWELL account so it follows you across devices. PDFs and Trace results NEVER leave your browser.">
-      &#9729; Cloud Sync: <span id="cloudSyncStatus">Off</span> <!-- Added Button for enabling Cloud Sync -->
+      &#9729; Cloud Sync: <span id="cloudSyncStatus">Off</span> <!-- Added a Button for enabling Cloud Sync -->
     </button>
     <form method="post" action="{% url 'logout' %}" style="display: contents">
       {% csrf_token %}
