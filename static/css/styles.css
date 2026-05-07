@@ -1,3 +1,4 @@
+/* Used in both Light & Dark mode(s); Soft Sky Light Mode, Abyss Dark Blue */
 :root {
   --bg-primary: #0a0e17;
   --bg-secondary: #111827;
@@ -693,6 +694,32 @@ body {
 .add-doc-btn:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
 .toolbar-btn:hover { color: var(--text-primary); border-color: var(--accent-blue); }
 
+.toolbar-btn.cloud-sync-on {
+  color: var(--text-primary);
+  border-color: var(--accent-cyan, #06b6d4);
+  background: rgba(6, 182, 212, 0.10);
+}
+.toolbar-btn.cloud-sync-on:hover { border-color: var(--accent-cyan, #06b6d4); }
+
+.cloud-sync-banner {
+  position: absolute;
+  bottom: 64px;
+  right: 40px;
+  z-index: 2;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #5a6f94);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 4px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.cloud-sync-banner.cloud-sync-banner-on {
+  color: var(--accent-cyan, #06b6d4);
+  background: rgba(6, 182, 212, 0.10);
+}
+
 .section-toolbar {
   display: flex;
   gap: 8px;
@@ -785,6 +812,70 @@ body {
 }
 .hier-card .hier-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
 .hier-card .hier-desc { font-size: 0.78rem; color: var(--text-muted); }
+.hier-card.has-more {
+  cursor: pointer;
+  padding-bottom: 22px;
+}
+.hier-card.has-more::after {
+  content: '\25BE'; /* ▾ */
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  color: var(--hier-color, var(--text-muted));
+  opacity: 0.55;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.hier-card.has-more:hover::after { opacity: 1; }
+.hier-card.has-more.expanded::after {
+  transform: translateX(-50%) rotate(180deg);
+  opacity: 1;
+}
+.hier-card-more {
+  display: none;
+  margin: 12px -8px 4px;
+  padding: 12px 4px 4px;
+  border-top: 1px dashed color-mix(in srgb, var(--hier-color, var(--border)) 50%, transparent);
+  text-align: left;
+}
+.hier-card.expanded .hier-card-more { display: block; }
+.hier-card-role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.hier-card-desc-full {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+  white-space: pre-wrap;
+}
+.hier-card-refs { margin-top: 8px; }
+.hier-card-refs-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.hier-card-ref-chip {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--hier-color, var(--border)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hier-color, var(--border)) 32%, transparent);
+  color: var(--text-secondary);
+}
 .hier-actions {
   position: absolute;
   top: 6px;
@@ -2669,6 +2760,155 @@ select.modal-input {
 .cert-doc-indexing { color: var(--accent-cyan); }
 .cert-doc-warn { color: var(--accent-amber); }
 .cert-doc-error { color: var(--accent-rose); }
+.cert-doc-ocr { color: var(--accent-purple); }
+.cert-doc-ocr-progress {
+  color: var(--accent-cyan);
+  animation: cert-ocr-pulse 1.4s ease-in-out infinite;
+}
+@keyframes cert-ocr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.cert-doc-ocr-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--accent-purple);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+.cert-doc-ocr-btn:hover {
+  color: var(--text-primary);
+  background: rgba(139, 92, 246, 0.14);
+  border-color: var(--accent-purple);
+}
+
+/* Per-doc group tag — small chip rendered next to the file name in the
+   docs list. Color is supplied per-instance via inline --group-color so
+   each named group keeps its own hue. */
+.cert-doc-group-tag {
+  --group-color: var(--accent-cyan, #06b6d4);
+  display: inline-flex;
+  align-items: center;
+  max-width: 160px;
+  padding: 2px 9px;
+  background: color-mix(in srgb, var(--group-color) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--group-color) 38%, transparent);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--group-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+/* Group filter chipset above the docs list. Always rendered — the
+   "+ Add Group" button stays reachable even with no docs / no groups. */
+.cert-docs-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+}
+.cert-group-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.cert-group-chip:hover {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--accent-cyan, #06b6d4) 40%, var(--border));
+}
+.cert-group-chip.active {
+  color: var(--accent-cyan, #06b6d4);
+  background: rgba(6, 182, 212, 0.10);
+  border-color: var(--accent-cyan, #06b6d4);
+}
+
+/* Named-group chip — wrapped in a span so the delete X button can sit
+   absolutely-positioned at the top-right and only show on wrap-hover. */
+.cert-group-chip-wrap {
+  --group-color: var(--accent-cyan, #06b6d4);
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+}
+.cert-group-chip-named .cert-group-chip-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--group-color);
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.cert-group-chip-named:hover {
+  color: var(--text-secondary);
+  border-color: var(--group-color);
+}
+.cert-group-chip-named.active {
+  color: var(--group-color);
+  background: color-mix(in srgb, var(--group-color) 12%, transparent);
+  border-color: var(--group-color);
+}
+.cert-group-chip-del {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.cert-group-chip-wrap:hover .cert-group-chip-del { display: inline-flex; }
+.cert-group-chip-del:hover {
+  color: var(--accent-rose);
+  border-color: var(--accent-rose);
+}
+
+/* "+ Add Group" — dashed outline distinguishes it from filter chips. */
+.cert-group-chip-add {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+.cert-group-chip-add:hover {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* Native color picker — keep it compact in the Add Group modal. */
+.cert-color-input {
+  width: 56px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  cursor: pointer;
+}
+.cert-color-input:hover { border-color: var(--accent-blue); }
 
 /* Graph */
 .cert-graph {
@@ -2737,6 +2977,7 @@ select.modal-input {
 .cert-graph-node-error .cert-node-count { fill: var(--accent-rose); }
 .cert-graph-node-notext .cert-node-count { fill: var(--accent-amber); }
 .cert-graph-node-indexing .cert-node-count { fill: var(--accent-cyan); }
+.cert-graph-node-ocr .cert-node-count { fill: var(--accent-purple); }
 .cert-node-label {
   font-family: 'DM Sans', sans-serif;
   font-size: 0.72rem;
@@ -2798,6 +3039,7 @@ select.modal-input {
 }
 .cert-legend-notext { background: var(--accent-amber); }
 .cert-legend-err { background: var(--accent-rose); }
+.cert-legend-ocr { background: var(--accent-purple); }
 
 /* Results */
 .cert-results-pane {
@@ -2850,6 +3092,32 @@ select.modal-input {
 .cert-result-notext .cert-result-icon { color: var(--accent-amber); background: rgba(245,158,11,0.12); }
 .cert-result-error .cert-result-icon { color: var(--accent-rose); background: rgba(244,63,94,0.18); }
 .cert-result-indexing .cert-result-icon { color: var(--accent-cyan); background: rgba(6,182,212,0.12); }
+.cert-result-ocr.cert-result-hit .cert-result-icon {
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.14);
+}
+.cert-ocr-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.10);
+  border: 1px solid rgba(139, 92, 246, 0.34);
+  flex-shrink: 0;
+}
+.cert-hit-conf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.10);
+  border: 1px solid rgba(139, 92, 246, 0.32);
+  flex-shrink: 0;
+}
 .cert-result-name {
   flex: 1;
   min-width: 0;

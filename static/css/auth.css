@@ -42,6 +42,39 @@ body.auth-body::before {
   z-index: 0;
 }
 
+body.auth-body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+
+  /* Same grid, but brighter */
+  background-image:
+    linear-gradient(to right,  rgba(125,211,252,0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(125,211,252,0.25) 1px, transparent 1px);
+
+  background-size: 32px 32px;
+
+  /* Only visible near cursor */
+  mask-image: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(0,0,0,1) 0px,
+    rgba(0,0,0,0.8) 100px,
+    rgba(0,0,0,0.4) 180px,
+    transparent 260px
+  );
+
+  -webkit-mask-image: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(0,0,0,1) 0px,
+    rgba(0,0,0,0.8) 100px,
+    rgba(0,0,0,0.4) 180px,
+    transparent 260px
+  );
+
+  pointer-events: none;
+  z-index: 0;
+}
+
 .auth-card {
   position: relative;
   z-index: 1;
@@ -55,6 +88,7 @@ body.auth-body::before {
               0 0 0 1px rgba(59,130,246,0.08) inset;
 }
 
+/* 21:9 */
 /* To enable a workshop / illustration background, uncomment this block and
    swap the url() to the desired asset under static/. The overlays + frosted
    card are tuned to keep the form readable on top of a busy image. */

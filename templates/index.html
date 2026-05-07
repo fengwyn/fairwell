@@ -20,11 +20,16 @@
     <button class="toolbar-btn" onclick="handleLoadJson()">Load Data</button>
     <button class="toolbar-btn" onclick="handleExport()">Export Data</button>
     <button class="toolbar-btn" onclick="handleReset()">Reset to Defaults</button>
+    <button class="toolbar-btn" id="cloudSyncToggle" onclick="toggleCloudSync()"
+            title="Cloud Sync stores your metadata in your FAIRWELL account so it follows you across devices. PDFs and Trace results NEVER leave your browser.">
+      &#9729; Cloud Sync: <span id="cloudSyncStatus">Off</span> <!-- Added a Button for enabling Cloud Sync -->
+    </button>
     <form method="post" action="{% url 'logout' %}" style="display: contents">
       {% csrf_token %}
       <button type="submit" class="toolbar-btn" title="Signed in as {{ user.username }}">Logout</button>
     </form>
   </div>
+  <div class="cloud-sync-banner" id="cloudSyncBanner">Cloud Sync OFF &middot; all data stays in this browser</div>
   <h1>FAIR<strong>WELL</strong></h1>
   <div class="subtitle"></div>
   <div class="special-chars" id="specialCharsBar"></div>
@@ -39,7 +44,6 @@
     </svg>
     <!-- Label Tag Here: Home -->
   </button>
-  <button class="nav-btn" onclick="showSection('relationships')">Document Map</button>
   <button class="nav-btn" onclick="showSection('hierarchy')">Hierarchy</button>
   <button class="nav-btn" onclick="showSection('decision')">Decision Flow</button>
   <button class="nav-btn" onclick="showSection('forms')">Interactive Forms</button>
@@ -59,7 +63,7 @@
 <div id="home" class="section active">
   <div class="home-layout">
     <div class="home-content">
-      <div class="home-eyebrow">FAIRWELL // Version: [Adelie 1.0]</div>
+      <div class="home-eyebrow">FAIRWELL // Version: Adelie 1.1 &ltDEVELOPMENT BUILD&gt </div>
       <div class="section-header">
         <h2 class="section-title">Home</h2>
       </div>
@@ -69,8 +73,7 @@
         <section class="home-card">
           <div class="home-card-label">What this tool does</div>
           <ul class="home-card-list">
-            <li><strong>Document Map</strong>: Cards for every governing document, with cross-references and links</li>
-            <li><strong>Hierarchy</strong>: Visual tree from enterprise standards down to the operational forms</li>
+            <li><strong>Hierarchy</strong>: Visual tree from enterprise standards down to operational forms — click any card to expand role, description, and cross-references</li>
             <li><strong>Decision Flow</strong>: Step-by-step guide for deciding which document answers a question</li>
             <li><strong>Interactive Forms</strong>: AS9102 Forms 1/2/3 with clickable field-level references</li>
             <li><strong>Generate Turnbacks</strong>: Batch turnback composer that exports to the Findings template</li>
@@ -99,24 +102,14 @@
   </div>
 </div>
 
-<!-- SECTION 1: Document Relationships (rendered dynamically) -->
-<div id="relationships" class="section">
-  <div class="section-header">
-    <h2 class="section-title">Document Relationship Map</h2>
-    <button class="add-doc-btn" onclick="openDocModal(-1)">+ Add Document</button>
-    <button class="toolbar-btn" onclick="openManageTypesModal()">Manage Types</button>
-  </div>
-  <p class="section-desc" data-section-desc="relationships">Documents that govern the FAIR process. Each has a distinct role, and they cross-reference each other extensively.</p>
-  <div id="docGrid" class="doc-grid"></div>
-</div>
-
-<!-- SECTION 2: Hierarchy (rendered dynamically) -->
+<!-- SECTION 1: Hierarchy (rendered dynamically) -->
 <div id="hierarchy" class="section">
   <div class="section-header">
-    <h2 class="section-title">Document Hierarchy</h2>
+    <h2 class="section-title">Hierarchy</h2>
     <button class="add-doc-btn" onclick="openHierLevelModal()">+ Add Level</button>
+    <button class="toolbar-btn" onclick="openManageTypesModal()">Manage Types</button>
   </div>
-  <p class="section-desc" data-section-desc="hierarchy">Enter your enterprise foundation, supplements and operational documents in the FAI forms.</p>
+  <p class="section-desc" data-section-desc="hierarchy">Top-down map of your governing documents. Click any card to expand its role, description, and cross-references.</p>
   <div class="hierarchy" id="hierarchyContainer"></div>
 </div>
 
@@ -265,6 +258,7 @@
         <span class="cert-pane-title">Documents</span>
         <span class="cert-pane-count" id="certDocsCount">0</span>
       </header>
+      <div class="cert-docs-filter" id="certDocsFilter"></div>
       <div class="cert-docs-list" id="certDocsList"></div>
     </section>
 
@@ -353,7 +347,7 @@
 <div class="about-popover" id="aboutPopover" role="dialog" aria-label="About Fairwell" hidden>
   <button class="about-close" type="button" aria-label="Close">&times;</button>
   <div class="about-title">FAIRWELL</div>
-  <div class="about-version">Version: Adelie 1.0</div>
+  <div class="about-version">Version: Adelie 1.1</div>
 </div>
 
 <div class="doc-viewer-overlay" id="docViewerOverlay" role="dialog" aria-modal="true" aria-labelledby="docViewerTitle" hidden>
@@ -369,6 +363,7 @@
 
 <script src="{% static 'js/data.js' %}"></script>
 <script src="{% static 'js/documentsApi.js' %}"></script>
+<script src="{% static 'js/catalogApi.js' %}"></script>
 <script src="{% static 'js/scripts.js' %}"></script>
 <script src="{% static 'js/reviewMode.js' %}"></script>
 <script src="{% static 'lib/pdfjs/pdf.js' %}"></script>

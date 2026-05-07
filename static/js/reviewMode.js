@@ -1,4 +1,4 @@
-// FAIRWELL Review Mode — batch turnback composer.
+// FAIRWELL Review Mode: Batch turnback composer.
 // Catalog and reference-doc metadata live in appData (loaded from data.json or
 // edited in-app). The public codebase ships empty; proprietary turnbacks are
 // added by the user or loaded via "Load Data".
@@ -28,6 +28,25 @@ const reviewState = {
 // Accessors
 function reviewCatalog() { return (appData && appData.reviewTurnbacks) || []; }
 function reviewRefMeta() { return (appData && appData.reviewRefMeta) || {}; }
+
+// Persistence: when Cloud Sync is on, write to /api/catalog/ AND mirror to
+// localStorage (dual-write — local stays usable if the user later disables sync).
+// When off, localStorage is the only store.
+async function revPersistTurnbacks(next) {
+  if (typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API) {
+    await apiPatchCatalogKind('reviewTurnbacks', next);
+  }
+  appData.reviewTurnbacks = next;
+  saveData(appData);
+}
+
+async function revPersistRefMeta(next) {
+  if (typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API) {
+    await apiPatchCatalogKind('reviewRefMeta', next);
+  }
+  appData.reviewRefMeta = next;
+  saveData(appData);
+}
 
 // Attribute-safe encode for single-quoted onclick="" values.
 function revAttr(val) {
@@ -389,15 +408,17 @@ function revCancelDescEdit() {
   renderReviewComposer();
 }
 
-function revSaveDescEdit() {
+async function revSaveDescEdit() {
   const ta = document.getElementById('revDescEditor');
   if (!ta) return;
   const newDesc = ta.value.trim();
-  if (!Array.isArray(appData.reviewTurnbacks)) return;
-  const i = appData.reviewTurnbacks.findIndex(t => t.id === reviewState.selectedId);
+  const list = Array.isArray(appData.reviewTurnbacks) ? appData.reviewTurnbacks : [];
+  const i = list.findIndex(t => t.id === reviewState.selectedId);
   if (i < 0) { reviewState.editingDesc = false; renderReviewComposer(); return; }
-  appData.reviewTurnbacks[i].desc = newDesc;
-  saveData(appData);
+  const next = list.slice();
+  next[i] = { ...list[i], desc: newDesc };
+  try { await revPersistTurnbacks(next); }
+  catch (err) { alert('Save failed: ' + err.message); return; }
   reviewState.editingDesc = false;
   renderReviewComposer();
 }
@@ -718,7 +739,7 @@ function suggestReviewTbId() {
   return Math.max(...ids) + 1;
 }
 
-function saveReviewTurnback(editingId) {
+async function saveReviewTurnback(editingId) {
   const isEdit = editingId !== null && editingId !== undefined;
   const idRaw = document.getElementById('revTbId').value.trim();
   const id = Number(idRaw);
@@ -751,26 +772,32 @@ function saveReviewTurnback(editingId) {
 
   if (!record.ttl) { alert('Title is required.'); return; }
 
-  if (!Array.isArray(appData.reviewTurnbacks)) appData.reviewTurnbacks = [];
+  const list = Array.isArray(appData.reviewTurnbacks) ? appData.reviewTurnbacks : [];
+  let next;
   if (isEdit) {
-    const i = appData.reviewTurnbacks.findIndex(t => t.id === editingId);
-    if (i >= 0) appData.reviewTurnbacks[i] = record;
-    if (reviewState.selectedId === editingId) reviewState.selectedId = record.id;
+    next = list.slice();
+    const i = next.findIndex(t => t.id === editingId);
+    if (i >= 0) next[i] = record;
   } else {
-    appData.reviewTurnbacks.push(record);
+    next = list.concat([record]);
   }
-  saveData(appData);
+
+  try { await revPersistTurnbacks(next); }
+  catch (err) { alert('Save failed: ' + err.message); return; }
+
+  if (isEdit && reviewState.selectedId === editingId) reviewState.selectedId = record.id;
   closeModal();
   renderReviewMode();
 }
 
-function deleteReviewTurnback(tid) {
+async function deleteReviewTurnback(tid) {
   const tb = reviewCatalog().find(t => t.id === tid);
   if (!tb) return;
   if (!confirm(`Delete turnback TB-${tb.id} "${tb.ttl || ''}"?`)) return;
-  appData.reviewTurnbacks = appData.reviewTurnbacks.filter(t => t.id !== tid);
+  const next = (appData.reviewTurnbacks || []).filter(t => t.id !== tid);
+  try { await revPersistTurnbacks(next); }
+  catch (err) { alert('Delete failed: ' + err.message); return; }
   if (reviewState.selectedId === tid) reviewState.selectedId = null;
-  saveData(appData);
   renderReviewMode();
 }
 
@@ -798,7 +825,7 @@ function openReviewRefMetaModal() {
     <button type="button" class="panel-add-btn" id="revRefMetaAddBtn">+ Add Row</button>
   `;
 
-  openModal('Reference Document Metadata', body, () => {
+  openModal('Reference Document Metadata', body, async () => {
     const next = {};
     document.querySelectorAll('#revRefMetaRows .rev-refmeta-row').forEach(row => {
       const name = row.querySelector('.rev-refmeta-name').value.trim();
@@ -806,8 +833,8 @@ function openReviewRefMetaModal() {
       const tone = row.querySelector('.rev-refmeta-tone').value;
       if (name) next[name] = { full, tone };
     });
-    appData.reviewRefMeta = next;
-    saveData(appData);
+    try { await revPersistRefMeta(next); }
+    catch (err) { alert('Save failed: ' + err.message); return; }
     closeModal();
     renderReviewComposer();
   });

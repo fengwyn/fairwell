@@ -1,7 +1,23 @@
-// FAIRWELL UI — rendering, navigation, modals, and CRUD.
+// FAIRWELL UI: rendering, navigation, modals, and CRUD.
 // Depends on data.js (SEED_DATA, loadData, saveData, etc.)
 
 let appData = loadData();
+
+// Documents are owned by /api/documents/, not localStorage. Discard any stale
+// doc list that may be in localStorage from a previous user on this browser
+// (e.g. a logout/login as a different account) so the SPA never renders docs
+// the current account doesn't own.
+
+if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
+  appData.documents = [];
+}
+
+// Same defense for the catalog kinds the API now owns. Each Phase 4 migration
+// adds its kind here so a previous user's localStorage can't bleed through.
+if (typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API) {
+  appData.reviewTurnbacks = [];
+  appData.reviewRefMeta = {};
+}
 
 // ────────────────────────── Navigation ──────────────────────────
 
@@ -21,67 +37,33 @@ function showForm(id) {
   event.target.classList.add('active');
 }
 
-// ────────────────────────── Document Map ──────────────────────────
-
-function renderDocGrid() {
-  const grid = document.getElementById('docGrid');
-  grid.innerHTML = '';
-  appData.documents.forEach((doc, idx) => {
-    const card = document.createElement('div');
-    card.className = 'doc-card';
-    card.style.setProperty('--card-color', `var(--${doc.colorClass})`);
-    card.innerHTML = `
-      <div class="doc-header">
-        <span class="doc-badge">${esc(doc.badge)}</span>
-        <a href="${esc(doc.url)}" class="doc-title-link">${esc(doc.title)}</a>
-        <div class="doc-actions">
-          <button class="icon-btn edit-btn" title="Edit document" data-idx="${idx}">&#9998;</button>
-          <button class="icon-btn delete-btn" title="Delete document" data-idx="${idx}">&times;</button>
-        </div>
-      </div>
-      <div class="doc-role">${esc(doc.role)}</div>
-      <div class="doc-desc">${esc(doc.desc)}</div>
-      <div class="doc-links">
-        ${doc.links.map(l => `<a href="${esc(l.url)}" class="doc-link">\u2192 ${esc(l.text)}</a>`).join('')}
-      </div>
-    `;
-    card.querySelector('.edit-btn').onclick = (e) => { e.stopPropagation(); openDocModal(idx); };
-    card.querySelector('.delete-btn').onclick = (e) => { e.stopPropagation(); deleteDocument(idx); };
-    grid.appendChild(card);
-  });
-}
-
-async function deleteDocument(idx) {
-  if (!confirm('Delete this document?')) return;
-  const doc = appData.documents[idx];
-  if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
-    try {
-      await apiDeleteDocument(doc.id);
-    } catch (err) {
-      alert('Delete failed: ' + err.message);
-      return;
-    }
-    appData.documents.splice(idx, 1);
-  } else {
-    appData.documents.splice(idx, 1);
-    saveData(appData);
-  }
-  renderDocGrid();
-}
-
 async function hydrateCatalogFromApi() {
   try {
-    const [colors, types, documents] = await Promise.all([
+    const useCatalog = typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API;
+    const promises = [
       apiFetchColors(),
       apiFetchTypes(),
       apiFetchDocuments(),
-    ]);
+    ];
+    if (useCatalog) promises.push(apiFetchCatalog());
+    const [colors, types, documents, catalog] = await Promise.all(promises);
     if (Array.isArray(colors) && colors.length) appData.colors = colors;
     if (Array.isArray(types) && types.length) appData.types = types;
     appData.documents = documents;
+    if (useCatalog && catalog && typeof catalog === 'object') {
+      if (Array.isArray(catalog.reviewTurnbacks)) appData.reviewTurnbacks = catalog.reviewTurnbacks;
+      if (catalog.reviewRefMeta && typeof catalog.reviewRefMeta === 'object') {
+        appData.reviewRefMeta = catalog.reviewRefMeta;
+      }
+    }
     applyCustomColors();
     if (typeof renderLegend === 'function') renderLegend();
-    renderDocGrid();
+    migrateDocumentsToHierarchy();
+    renderHierarchy();
+    if (typeof renderReviewMode === 'function') renderReviewMode();
+    // Mirror server state to localStorage so toggling Cloud Sync off later
+    // keeps the user's data instead of stranding them on stale local state.
+    saveData(appData);
   } catch (err) {
     console.error('Failed to hydrate catalog from API:', err);
   }
@@ -126,17 +108,18 @@ function openManageTypesModal() {
   };
 
   const wireRows = () => {
+    const useApi = typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API;
     document.querySelectorAll('.del-type-btn').forEach(btn => {
       btn.onclick = async () => {
         const slug = btn.dataset.slug;
         if (!confirm(`Delete type "${slug}"?`)) return;
-        try {
-          await apiDeleteType(slug);
-          appData.types = appData.types.filter(t => t.id !== slug);
-          refresh();
-        } catch (err) {
-          alert('Delete failed: ' + err.message);
+        if (useApi) {
+          try { await apiDeleteType(slug); }
+          catch (err) { alert('Delete failed: ' + err.message); return; }
         }
+        appData.types = appData.types.filter(t => t.id !== slug);
+        saveData(appData);
+        refresh();
       };
     });
     const addBtn = document.getElementById('addTypeBtn');
@@ -145,13 +128,20 @@ function openManageTypesModal() {
         const label = document.getElementById('newTypeLabel').value.trim();
         const colorId = document.getElementById('newTypeColor').value;
         if (!label) { alert('Label is required'); return; }
-        try {
-          const created = await apiCreateType({ label, colorId });
-          appData.types.push(created);
-          refresh();
-        } catch (err) {
-          alert('Add failed: ' + err.message);
+        let record;
+        if (useApi) {
+          try { record = await apiCreateType({ label, colorId }); }
+          catch (err) { alert('Add failed: ' + err.message); return; }
+        } else {
+          // Local-only: build a slug deterministically (mirrors backend _slugify).
+          const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 64) || 'type';
+          let slug = base, n = 2;
+          while (appData.types.some(t => t.id === slug)) { slug = `${base}-${n++}`; }
+          record = { id: slug, label, colorId };
         }
+        appData.types.push(record);
+        saveData(appData);
+        refresh();
       };
     }
   };
@@ -166,43 +156,72 @@ function renderHierarchy() {
   const container = document.getElementById('hierarchyContainer');
   if (!container) return;
   const levels = appData.hierarchy || [];
+  const types = getTypes(appData);
+
+  // Preserve which cards are open across re-renders (UI-only state).
+  const prev = container.__expandedKeys || new Set();
+  const next = new Set();
+
   container.innerHTML = '';
 
   levels.forEach((level, li) => {
-    // Connector between levels (skip before first)
     if (li > 0) {
       container.insertAdjacentHTML('beforeend',
         '<div class="hierarchy-connector"><div class="connector-line"></div></div>');
     }
-
     const isBranch = level.type === 'branch';
     const wrapper = document.createElement('div');
     wrapper.className = isBranch ? 'hierarchy-branch' : 'hierarchy-level';
 
     level.cards.forEach((card, ci) => {
-      const colorVar = `var(--${card.colorId || 'accent-blue'})`;
+      const key = `${li}:${ci}`;
+      const type = card.typeId ? types.find(t => t.id === card.typeId) : null;
+      const colorId = (type && type.colorId) || card.colorId || 'accent-blue';
+      const colorVar = `var(--${colorId})`;
+      const badgeText = card.badge || (type ? type.label : '');
+      const refs = Array.isArray(card.links) ? card.links.filter(l => l && l.text) : [];
+      const hasMore = !!(card.role || card.desc || refs.length);
+      const isExpanded = prev.has(key) && hasMore;
+      if (isExpanded) next.add(key);
+
       const cardEl = document.createElement('div');
-      cardEl.className = `hier-card${card.foundation ? ' foundation' : ''}`;
+      cardEl.className = 'hier-card'
+        + (card.foundation ? ' foundation' : '')
+        + (hasMore ? ' has-more' : '')
+        + (isExpanded ? ' expanded' : '');
       cardEl.style.setProperty('--hier-color', colorVar);
+      cardEl.dataset.key = key;
+
       const moveBtns = [];
       if (li > 0) moveBtns.push(`<button class="icon-btn-sm" title="Move card up" data-move="up" data-li="${li}" data-ci="${ci}">&uarr;</button>`);
       if (li < levels.length - 1) moveBtns.push(`<button class="icon-btn-sm" title="Move card down" data-move="down" data-li="${li}" data-ci="${ci}">&darr;</button>`);
       if (ci > 0) moveBtns.push(`<button class="icon-btn-sm" title="Move card left" data-move="left" data-li="${li}" data-ci="${ci}">&larr;</button>`);
       if (ci < level.cards.length - 1) moveBtns.push(`<button class="icon-btn-sm" title="Move card right" data-move="right" data-li="${li}" data-ci="${ci}">&rarr;</button>`);
+
+      const moreHtml = hasMore ? `
+        <div class="hier-card-more">
+          ${card.role ? `<div class="hier-card-role">${esc(card.role)}</div>` : ''}
+          ${card.desc ? `<div class="hier-card-desc-full">${esc(card.desc)}</div>` : ''}
+          ${refs.length ? `
+            <div class="hier-card-refs">
+              <div class="hier-card-refs-label">Cross-references</div>
+              ${refs.map(l => `<span class="hier-card-ref-chip">${esc(l.text)}</span>`).join('')}
+            </div>` : ''}
+        </div>` : '';
+
       cardEl.innerHTML = `
-        <div class="hier-badge" style="background:color-mix(in srgb, ${colorVar} 15%, transparent);color:${colorVar};">${esc(card.badge)}</div>
+        ${badgeText ? `<div class="hier-badge" style="background:color-mix(in srgb, ${colorVar} 15%, transparent);color:${colorVar};">${esc(badgeText)}</div>` : ''}
         <div class="hier-name">${esc(card.name)}</div>
-        <div class="hier-desc">${esc(card.desc)}</div>
+        ${moreHtml}
         <div class="hier-actions">
           ${moveBtns.join('')}
-          <button class="icon-btn-sm" title="Edit card" data-li="${li}" data-ci="${ci}">&#9998;</button>
+          <button class="icon-btn-sm" title="Edit card" data-edit data-li="${li}" data-ci="${ci}">&#9998;</button>
           <button class="icon-btn-sm hier-del" title="Delete card" data-li="${li}" data-ci="${ci}">&times;</button>
         </div>
       `;
       wrapper.appendChild(cardEl);
     });
 
-    // "+ Add Card" button for all levels
     const addBtn = document.createElement('button');
     addBtn.className = 'hier-add-card-btn';
     addBtn.textContent = '+';
@@ -212,7 +231,6 @@ function renderHierarchy() {
 
     container.appendChild(wrapper);
 
-    // Level action bar (switch type / delete level)
     const levelBar = document.createElement('div');
     levelBar.className = 'hier-level-bar';
     levelBar.innerHTML = `
@@ -222,20 +240,23 @@ function renderHierarchy() {
     container.appendChild(levelBar);
   });
 
-  // Wire card move buttons
   container.querySelectorAll('.hier-card [data-move]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); moveHierCard(+btn.dataset.li, +btn.dataset.ci, btn.dataset.move); };
   });
-  // Wire card edit buttons (no data-move, not .hier-del)
-  container.querySelectorAll('.hier-card .icon-btn-sm:not(.hier-del):not([data-move])').forEach(btn => {
+  container.querySelectorAll('.hier-card [data-edit]').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); openHierCardModal(+btn.dataset.li, +btn.dataset.ci); };
   });
   container.querySelectorAll('.hier-card .hier-del').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); deleteHierCard(+btn.dataset.li, +btn.dataset.ci); };
   });
-
-
-  // Wire level bar buttons
+  // Click-anywhere-on-card toggles "More information" panel.
+  container.querySelectorAll('.hier-card.has-more').forEach(cardEl => {
+    cardEl.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const k = cardEl.dataset.key;
+      if (cardEl.classList.toggle('expanded')) next.add(k); else next.delete(k);
+    });
+  });
   container.querySelectorAll('.hier-level-bar .icon-btn-sm').forEach(btn => {
     const action = btn.dataset.action;
     btn.onclick = () => {
@@ -243,6 +264,47 @@ function renderHierarchy() {
       else if (action === 'delLevel') deleteHierLevel(+btn.dataset.li);
     };
   });
+
+  container.__expandedKeys = next;
+}
+
+// One-time migration: when the user upgrades from the old Document Map
+// section, fold their existing `appData.documents` rows into a new bottom
+// level of the hierarchy. Idempotent — gated by a marker on the migrated
+// level (survives via existing data sync) plus a localStorage sentinel so
+// it never re-runs in the same browser even if the marker is later edited
+// out by hand.
+function migrateDocumentsToHierarchy() {
+  if (!Array.isArray(appData.hierarchy)) appData.hierarchy = [];
+  let flagOn = false;
+  try { flagOn = localStorage.getItem('fairwell_docmap_migrated_v1') === 'true'; } catch (_) {}
+  if (flagOn) return;
+  if (appData.hierarchy.some(l => l && l.migratedFromDocMap === true)) {
+    try { localStorage.setItem('fairwell_docmap_migrated_v1', 'true'); } catch (_) {}
+    return;
+  }
+  const docs = Array.isArray(appData.documents) ? appData.documents : [];
+  if (!docs.length) return;
+  const cards = docs.map(d => ({
+    typeId: d.typeId || '',
+    badge: d.badge || '',
+    colorId: d.colorClass || '',
+    name: d.title || '',
+    role: d.role || '',
+    desc: d.desc || '',
+    foundation: false,
+    links: (d.links || [])
+      .map(l => ({ text: (l && l.text) ? String(l.text).trim() : '' }))
+      .filter(l => l.text),
+  })).filter(c => c.name);
+  if (!cards.length) return;
+  appData.hierarchy.push({
+    type: cards.length > 1 ? 'branch' : 'single',
+    cards,
+    migratedFromDocMap: true,
+  });
+  try { localStorage.setItem('fairwell_docmap_migrated_v1', 'true'); } catch (_) {}
+  saveData(appData);
 }
 
 function openHierLevelModal() {
@@ -274,11 +336,22 @@ function openHierLevelModal() {
 function openHierCardModal(li, ci) {
   const level = appData.hierarchy[li];
   const isEdit = ci >= 0;
-  const card = isEdit ? level.cards[ci] : { badge: '', colorId: getColors(appData)[0]?.id || 'hsm236', name: '', desc: '', foundation: false };
+  const types = getTypes(appData);
+  const card = isEdit
+    ? level.cards[ci]
+    : { typeId: (types[0] && types[0].id) || '', badge: '', colorId: '', name: '', role: '', desc: '', foundation: false, links: [] };
 
-  const colorOpts = getColorOptions(appData).map(c =>
-    `<option value="${c.id}" ${c.id === card.colorId ? 'selected' : ''}>${c.label}</option>`
-  ).join('');
+  const typeOpts = ['<option value="">— None —</option>']
+    .concat(types.map(t =>
+      `<option value="${esc(t.id)}" ${t.id === card.typeId ? 'selected' : ''}>${esc(t.label)}</option>`
+    ))
+    .join('');
+
+  const linkRows = (card.links || []).map((l, i) => `
+    <div class="modal-link-row" data-li="${i}">
+      <input type="text" class="modal-input link-text" value="${esc((l && l.text) || '')}" placeholder="Cross-reference label (e.g. AS9102 §5.3)">
+      <button type="button" class="icon-btn-sm remove-link-btn">&times;</button>
+    </div>`).join('');
 
   const body = `
     <div class="modal-field">
@@ -287,17 +360,26 @@ function openHierCardModal(li, ci) {
     </div>
     <div class="modal-row">
       <div class="modal-field">
-        <label>Badge</label>
-        <input type="text" class="modal-input" id="mdHcBadge" value="${esc(card.badge)}" placeholder="e.g. FAI PROCEDURE">
+        <label>Type</label>
+        <select class="modal-input" id="mdHcType">${typeOpts}</select>
       </div>
       <div class="modal-field">
-        <label>Color</label>
-        <select class="modal-input" id="mdHcColor">${colorOpts}</select>
+        <label>Badge (optional override)</label>
+        <input type="text" class="modal-input" id="mdHcBadge" value="${esc(card.badge || '')}" placeholder="Leave blank to use Type label">
       </div>
     </div>
     <div class="modal-field">
+      <label>Role / Subtitle</label>
+      <input type="text" class="modal-input" id="mdHcRole" value="${esc(card.role || '')}" placeholder="e.g. Governing standard">
+    </div>
+    <div class="modal-field">
       <label>Description</label>
-      <input type="text" class="modal-input" id="mdHcDesc" value="${esc(card.desc)}" placeholder="Short description">
+      <textarea class="modal-input modal-textarea" id="mdHcDesc" rows="4" placeholder="What this document covers">${esc(card.desc || '')}</textarea>
+    </div>
+    <div class="modal-field">
+      <label>Cross-references</label>
+      <div id="mdHcLinks">${linkRows}</div>
+      <button type="button" class="panel-add-btn" id="mdHcAddLinkBtn" style="margin-top:8px">+ Add Reference</button>
     </div>
     <div class="modal-field">
       <label><input type="checkbox" id="mdHcFoundation" ${card.foundation ? 'checked' : ''}> Foundation card (special styling)</label>
@@ -305,22 +387,41 @@ function openHierCardModal(li, ci) {
   `;
 
   openModal(isEdit ? 'Edit Hierarchy Card' : 'Add Card to Level', body, () => {
+    const name = document.getElementById('mdHcName').value.trim();
+    if (!name) { alert('Name is required.'); return; }
+    const links = Array.from(document.querySelectorAll('#mdHcLinks .modal-link-row'))
+      .map(r => ({ text: r.querySelector('.link-text').value.trim() }))
+      .filter(l => l.text);
     const updated = {
-      badge: document.getElementById('mdHcBadge').value,
-      colorId: document.getElementById('mdHcColor').value,
-      name: document.getElementById('mdHcName').value,
+      typeId: document.getElementById('mdHcType').value,
+      badge: document.getElementById('mdHcBadge').value.trim(),
+      colorId: card.colorId || '',
+      name,
+      role: document.getElementById('mdHcRole').value.trim(),
       desc: document.getElementById('mdHcDesc').value,
-      foundation: document.getElementById('mdHcFoundation').checked
+      foundation: document.getElementById('mdHcFoundation').checked,
+      links
     };
-    if (!updated.name) { alert('Name is required.'); return; }
-    if (isEdit) {
-      level.cards[ci] = updated;
-    } else {
-      level.cards.push(updated);
-    }
+    if (isEdit) level.cards[ci] = updated;
+    else level.cards.push(updated);
     saveData(appData);
     renderHierarchy();
     closeModal();
+  });
+
+  document.getElementById('mdHcAddLinkBtn').onclick = () => {
+    const cont = document.getElementById('mdHcLinks');
+    const row = document.createElement('div');
+    row.className = 'modal-link-row';
+    row.innerHTML = `
+      <input type="text" class="modal-input link-text" value="" placeholder="Cross-reference label">
+      <button type="button" class="icon-btn-sm remove-link-btn">&times;</button>
+    `;
+    row.querySelector('.remove-link-btn').onclick = () => row.remove();
+    cont.appendChild(row);
+  };
+  document.querySelectorAll('#mdHcLinks .remove-link-btn').forEach(btn => {
+    btn.onclick = () => btn.closest('.modal-link-row').remove();
   });
 }
 
@@ -721,328 +822,6 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
 }
 
-// ── Document Add / Edit ──
-
-function openDocModal(idx) {
-  const isEdit = idx >= 0;
-  const firstType = getTypes(appData)[0] || { id: '', colorId: 'hsm236', label: '' };
-  const doc = isEdit
-    ? appData.documents[idx]
-    : { id: '', typeId: firstType.id, badge: firstType.label, colorClass: firstType.colorId, title: '', url: '#', role: '', desc: '', links: [] };
-
-  const currentTypeId = doc.typeId || inferDocTypeId(doc, appData);
-  const typeOpts = getTypeOptions(appData).map(t =>
-    `<option value="${t.id}" ${t.id === currentTypeId ? 'selected' : ''}>${t.label}</option>`
-  ).join('');
-
-  const linksHtml = doc.links.map((l, i) =>
-    `<div class="modal-link-row" data-li="${i}">
-      <input type="text" class="modal-input link-text" value="${esc(l.text)}" placeholder="Link text">
-      <input type="text" class="modal-input link-url" value="${esc(l.url)}" placeholder="URL or file path">
-      <button class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
-      <button class="icon-btn-sm remove-link-btn" data-li="${i}">&times;</button>
-    </div>`
-  ).join('');
-
-  const body = `
-    <div class="modal-field">
-      <label>Title</label>
-      <input type="text" class="modal-input" id="mdDocTitle" value="${esc(doc.title)}" placeholder="e.g. HSM236 Rev E">
-    </div>
-    <div class="modal-field">
-      <label>Badge (optional override)</label>
-      <input type="text" class="modal-input" id="mdDocBadge" value="${esc(doc.badge)}" placeholder="Leave blank to use Type label">
-    </div>
-    <div class="modal-row">
-      <div class="modal-field">
-        <label>Type</label>
-        <select class="modal-input" id="mdDocType">${typeOpts}</select>
-      </div>
-      <div class="modal-field">
-        <label>URL</label>
-        <div class="modal-link-row" id="mdDocUrlRow">
-          <input type="text" class="modal-input link-url" id="mdDocUrl" value="${esc(doc.url)}" placeholder="Drop a file here, paste URL, or /absolute/path">
-          <button type="button" class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
-          <button type="button" class="icon-btn-sm manual-link-btn" title="Type absolute path manually">\u{270E}</button>
-        </div>
-        <div class="link-hint">Drag a file from your file manager onto this field, click \u{1F4C1} to browse, or \u{270E} to type a path.</div>
-      </div>
-    </div>
-    <div class="modal-field">
-      <label>Role / Subtitle</label>
-      <input type="text" class="modal-input" id="mdDocRole" value="${esc(doc.role)}">
-    </div>
-    <div class="modal-field">
-      <label>Description</label>
-      <textarea class="modal-input modal-textarea" id="mdDocDesc" rows="4">${esc(doc.desc)}</textarea>
-    </div>
-    <div class="modal-field">
-      <label>Cross-Reference Links</label>
-      <div id="mdDocLinks">${linksHtml}</div>
-      <button class="panel-add-btn" id="mdAddLinkBtn" style="margin-top:8px">+ Add Link</button>
-    </div>
-  `;
-
-  openModal(isEdit ? 'Edit Document' : 'Add Document', body, async () => {
-    const selectedTypeId = document.getElementById('mdDocType').value;
-    const selectedType = getTypes(appData).find(t => t.id === selectedTypeId) || firstType;
-    const manualBadge = document.getElementById('mdDocBadge').value.trim();
-    const updated = {
-      id: doc.id || document.getElementById('mdDocTitle').value.toLowerCase().replace(/[^a-z0-9]/g, ''),
-      typeId: selectedType.id,
-      badge: manualBadge || selectedType.label,
-      colorClass: selectedType.colorId,
-      title: document.getElementById('mdDocTitle').value,
-      url: normalizeLocalPath(document.getElementById('mdDocUrl').value) || '#',
-      role: document.getElementById('mdDocRole').value,
-      desc: document.getElementById('mdDocDesc').value,
-      links: collectLinks()
-    };
-    if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
-      try {
-        const saved = isEdit
-          ? await apiUpdateDocument(doc.id, updated)
-          : await apiCreateDocument(updated);
-        if (isEdit) appData.documents[idx] = saved;
-        else appData.documents.push(saved);
-      } catch (err) {
-        alert('Save failed: ' + err.message);
-        return;
-      }
-    } else {
-      if (isEdit) appData.documents[idx] = updated;
-      else appData.documents.push(updated);
-      saveData(appData);
-    }
-    renderDocGrid();
-    closeModal();
-  });
-
-  // Wire add-link button
-  document.getElementById('mdAddLinkBtn').onclick = () => {
-    const container = document.getElementById('mdDocLinks');
-    const i = container.children.length;
-    const row = document.createElement('div');
-    row.className = 'modal-link-row';
-    row.dataset.li = i;
-    row.innerHTML = `
-      <input type="text" class="modal-input link-text" value="" placeholder="Link text">
-      <input type="text" class="modal-input link-url" value="#" placeholder="Drop a file, paste URL, or /absolute/path">
-      <button type="button" class="icon-btn-sm browse-link-btn" title="Browse for file">\u{1F4C1}</button>
-      <button type="button" class="icon-btn-sm manual-link-btn" title="Type absolute path manually">\u{270E}</button>
-      <button type="button" class="icon-btn-sm remove-link-btn">&times;</button>
-    `;
-    container.appendChild(row);
-    wireLinkRow(row);
-  };
-
-  // Wire existing rows
-  document.querySelectorAll('#mdDocLinks .modal-link-row').forEach(wireLinkRow);
-
-  // Wire the main doc URL: browse + manual buttons + drop zone on the whole row.
-  const mainUrlInput = document.getElementById('mdDocUrl');
-  document.querySelector('#mdDocUrlRow .browse-link-btn').onclick = () =>
-    pickFileIntoInput(mainUrlInput, null);
-  const mainManualBtn = document.querySelector('#mdDocUrlRow .manual-link-btn');
-  if (mainManualBtn) mainManualBtn.onclick = () => promptForManualPath(mainUrlInput);
-  wireDropToInput(mainUrlInput, document.getElementById('mdDocUrlRow'));
-}
-
-function wireLinkRow(row) {
-  row.querySelector('.remove-link-btn').onclick = () => row.remove();
-  const urlInput = row.querySelector('.link-url');
-  const textInput = row.querySelector('.link-text');
-  row.querySelector('.browse-link-btn').onclick = () => pickFileIntoInput(urlInput, textInput);
-  const manualBtn = row.querySelector('.manual-link-btn');
-  if (manualBtn) manualBtn.onclick = () => promptForManualPath(urlInput);
-  wireDropToInput(urlInput, row);
-}
-
-// Normalize a user-entered path or URL into something a browser can actually
-// follow. Bare absolute paths become file:// URLs so that links to local
-// documents resolve correctly instead of being treated as project-relative.
-// Path bodies are percent-encoded so spaces and non-ASCII don't break the URL.
-function safeDecodeURI(str) {
-  try {
-    return decodeURI(str);
-  } catch {
-    // Fix invalid % sequences like %A → %25A
-    return str.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
-  }
-}
-
-function normalizeLocalPath(input) {
-  if (!input) return '';
-  let t = String(input).trim();
-  if (!t || t === '#') return t;
-
-  // Handle file:// URLs explicitly
-  if (/^file:\/\//i.test(t)) {
-    let pathPart = t.replace(/^file:\/\/\/?/i, '/');
-
-    pathPart = safeDecodeURI(pathPart);
-
-    return 'file://' + encodeFilePath(pathPart);
-  }
-
-  // Other URLs (http, https, etc.)
-  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
-
-  // Local path
-  return 'file://' + encodeFilePath(safeDecodeURI(t));
-}
-
-// Percent-encode a filesystem path for use in a URL. encodeURI preserves the
-// structural characters browsers leave alone (`/`, `:`, `&`, `=`, `@`, etc.)
-// and encodes spaces, non-ASCII, control chars, and `%`. We post-encode `#`
-// and `?` so filenames containing them don't get misread as fragments/queries.
-function encodeFilePath(p) {
-  return encodeURI(p).replace(/#/g, '%23').replace(/\?/g, '%3F');
-}
-
-// Picker → input helper. On Electron/webview, File.path is the real absolute
-// path and we use it directly. In a regular browser, the file picker does not
-// expose absolute paths, so we chain straight into the manual-entry prompt
-// (pre-seeded with the basename the user just picked).
-async function pickFileIntoInput(urlInput, textInput) {
-  await pickFile((file) => {
-    if (textInput && !textInput.value.trim()) textInput.value = file.name;
-    if (file.path) {
-      urlInput.value = normalizeLocalPath(file.path);
-      return;
-    }
-    promptForManualPath(urlInput, {
-      reason: `Browsers hide absolute paths from the file picker. Picked: "${file.name}".`,
-      seedFilename: file.name
-    });
-  });
-}
-
-// Open a text prompt so the user can paste or type an absolute path or URL.
-// Pre-seeds with the current input value (decoded back to a human-readable
-// path if it looks like a file:// URL). Called from the "Type manually"
-// button AND as a fallback when drop/browse can't deliver an absolute path.
-function promptForManualPath(urlInput, opts) {
-  opts = opts || {};
-  const current = (urlInput.value || '').trim();
-  let seed = '';
-  if (current && current !== '#') {
-    if (/^file:\/\//i.test(current)) {
-      try {
-        seed = decodeURI(current.replace(/^file:\/\/\/?/i, '/'));
-      } catch (_) { seed = current; }
-    } else {
-      seed = current;
-    }
-  } else if (opts.seedFilename) {
-    seed = `/path/to/${opts.seedFilename}`;
-  }
-  const preamble = opts.reason ? `${opts.reason}\n\n` : '';
-  const entered = prompt(
-    `${preamble}Paste or type an absolute path or URL:\n\n` +
-    `  Linux / macOS:  /home/you/docs/file.pdf\n` +
-    `  Windows:        C:\\Users\\you\\Documents\\file.pdf\n` +
-    `  Web URL:        https://example.com/file.pdf`,
-    seed
-  );
-  if (entered == null) return;
-  const trimmed = entered.trim();
-  if (!trimmed) return;
-  urlInput.value = normalizeLocalPath(trimmed);
-  fillSiblingTextFromUrl(urlInput, urlInput.value);
-}
-
-// Make a URL input (and optionally a wider drop zone wrapping it) accept file
-// drops. File-manager drops deliver a pre-encoded file:// URL via
-// `text/uri-list` — that is the path-of-least-friction for users on any OS.
-function wireDropToInput(inputEl, zoneEl) {
-  if (!inputEl) return;
-  const zone = zoneEl || inputEl;
-  if (zone.dataset.dropWired) return;
-  zone.dataset.dropWired = '1';
-
-  const setHover = (on) => {
-    zone.classList.toggle('drop-hover', on);
-    inputEl.classList.toggle('drop-hover', on);
-  };
-
-  const accept = (e) => {
-    if (!e.dataTransfer) return false;
-    const types = Array.from(e.dataTransfer.types || []);
-    return types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain');
-  };
-
-  // dragenter AND dragover must both preventDefault for the drop to fire in
-  // every browser — Chromium is lenient, Firefox/Safari are stricter.
-  zone.addEventListener('dragenter', (e) => {
-    if (!accept(e)) return;
-    e.preventDefault();
-    setHover(true);
-  });
-  zone.addEventListener('dragover', (e) => {
-    if (!accept(e)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'link';
-    setHover(true);
-  });
-  zone.addEventListener('dragleave', (e) => {
-    if (zone.contains(e.relatedTarget)) return;
-    setHover(false);
-  });
-  zone.addEventListener('drop', (e) => {
-    if (!accept(e)) return;
-    e.preventDefault();
-    setHover(false);
-    const dt = e.dataTransfer;
-
-    // 1. Preferred: file-manager drop — pre-encoded file:// URL, exactly what we want.
-    const uriList = dt.getData('text/uri-list');
-    if (uriList) {
-      const first = uriList.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#'));
-      if (first) {
-        inputEl.value = first;
-        fillSiblingTextFromUrl(inputEl, first);
-        return;
-      }
-    }
-
-    // 2. Plain text drop (e.g. from a terminal or another app).
-    const text = dt.getData('text/plain');
-    if (text) {
-      const first = text.split('\n').map(l => l.trim()).find(l => l);
-      if (first) {
-        inputEl.value = normalizeLocalPath(first);
-        fillSiblingTextFromUrl(inputEl, inputEl.value);
-        return;
-      }
-    }
-
-    // 3. DataTransfer.files — useful in Electron (has file.path) or as a last-
-    //    resort filename hint. If no absolute path is available, fall straight
-    //    through to the manual-entry prompt so the user is never stuck.
-    if (dt.files && dt.files.length > 0) {
-      const file = dt.files[0];
-      if (file.path) {
-        inputEl.value = normalizeLocalPath(file.path);
-        const row = inputEl.closest('.modal-link-row');
-        const textInput = row && row.querySelector('.link-text');
-        if (textInput && !textInput.value.trim()) textInput.value = file.name;
-        return;
-      }
-      promptForManualPath(inputEl, {
-        reason: `Dropped "${file.name}" but this drop source didn't include the absolute path.`,
-        seedFilename: file.name
-      });
-      return;
-    }
-
-    // 4. Nothing usable — open the manual prompt anyway so the gesture isn't wasted.
-    promptForManualPath(inputEl, {
-      reason: `The drop didn't include a path — you can paste or type one below.`
-    });
-  });
-}
-
 // Global guard: prevent the browser from navigating to a file when the user
 // drops it ANYWHERE except a real drop zone. Without this, a missed drop on
 // the modal chrome (rather than exactly on the URL row) causes the page to
@@ -1056,19 +835,6 @@ function installFileDropGuard() {
     && Array.from(e.dataTransfer.types || []).includes('Files');
   window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
   window.addEventListener('drop',     (e) => { if (hasFiles(e)) e.preventDefault(); });
-}
-
-// If the drop target is inside a link row and the label field is empty, seed
-// the label with a readable filename decoded from the URL's last path segment.
-function fillSiblingTextFromUrl(inputEl, url) {
-  const row = inputEl.closest('.modal-link-row');
-  if (!row) return;
-  const textInput = row.querySelector('.link-text');
-  if (!textInput || textInput.value.trim()) return;
-  try {
-    const basename = decodeURIComponent((new URL(url, 'file:///').pathname.split('/').pop() || '').trim());
-    if (basename) textInput.value = basename;
-  } catch (_) { /* invalid URL — leave label alone */ }
 }
 
 async function pickFile(onFile) {
@@ -1096,17 +862,6 @@ async function pickFile(onFile) {
   fileInput.click();
 }
 
-function collectLinks() {
-  const rows = document.querySelectorAll('#mdDocLinks .modal-link-row');
-  const links = [];
-  rows.forEach(row => {
-    const text = row.querySelector('.link-text').value.trim();
-    const rawUrl = row.querySelector('.link-url').value.trim();
-    const url = normalizeLocalPath(rawUrl) || '#';
-    if (text) links.push({ text, url });
-  });
-  return links;
-}
 
 // ── Field Description (What to Check) Edit ──
 
@@ -1433,7 +1188,13 @@ function handleExport() {
 let dataFileHandle = null;
 
 async function handleLoadJson() {
-  if (!confirm('Load a JSON data file? This replaces current content. If your browser supports it, future edits will save back to this file.')) return;
+  const useApi =
+    (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) ||
+    (typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API);
+  const confirmMsg = useApi
+    ? 'Load a JSON data file? This replaces your current data on the server. Future edits save automatically to your account.'
+    : 'Load a JSON data file? This replaces current content. If your browser supports it, future edits will save back to this file.';
+  if (!confirm(confirmMsg)) return;
   try {
     if (window.showOpenFilePicker) {
       const [handle] = await window.showOpenFilePicker({
@@ -1442,9 +1203,14 @@ async function handleLoadJson() {
       });
       const file = await handle.getFile();
       const parsed = JSON.parse(await file.text());
-      dataFileHandle = handle;
-      applyImportedData(parsed);
-      alert(`Loaded ${handle.name}. Future edits will save back to this file.`);
+      // The local-file write-back is meaningless once edits go to the API,
+      // so only bind the handle when we're staying in localStorage mode.
+      if (!useApi) dataFileHandle = handle;
+      const ok = await applyImportedData(parsed);
+      if (!ok) return;
+      alert(useApi
+        ? `Loaded ${handle.name} into your account. Future edits save to the server.`
+        : `Loaded ${handle.name}. Future edits will save back to this file.`);
       return;
     }
   } catch (err) {
@@ -1454,12 +1220,14 @@ async function handleLoadJson() {
   }
   // Fallback: read-only file picker (browsers without File System Access API)
   pickFile(async (file) => {
-    try {
-      applyImportedData(JSON.parse(await file.text()));
-      alert('Loaded (read-only — this browser cannot write back automatically; use Export JSON to save changes).');
-    } catch {
-      alert('Failed to parse selected file as JSON.');
-    }
+    let parsed;
+    try { parsed = JSON.parse(await file.text()); }
+    catch { alert('Failed to parse selected file as JSON.'); return; }
+    const ok = await applyImportedData(parsed);
+    if (!ok) return;
+    alert(useApi
+      ? 'Loaded into your account. Future edits save to the server.'
+      : 'Loaded (read-only — this browser cannot write back automatically; use Export JSON to save changes).');
   });
 }
 
@@ -1481,10 +1249,10 @@ async function writeToDataFile(jsonText) {
   }
 }
 
-function applyImportedData(imported) {
+async function applyImportedData(imported) {
   if (!imported || typeof imported !== 'object') {
     alert('Invalid data format.');
-    return;
+    return false;
   }
   if (!imported.colors) imported.colors = JSON.parse(JSON.stringify(SEED_COLORS));
   if (!imported.types) imported.types = JSON.parse(JSON.stringify(SEED_TYPES));
@@ -1497,11 +1265,76 @@ function applyImportedData(imported) {
   if (!Array.isArray(imported.reviewTurnbacks)) imported.reviewTurnbacks = [];
   if (!imported.reviewRefMeta || typeof imported.reviewRefMeta !== 'object') imported.reviewRefMeta = {};
   if (!Array.isArray(imported.specialChars)) imported.specialChars = JSON.parse(JSON.stringify(SEED_SPECIAL_CHARS));
+  if (!imported.descriptions || typeof imported.descriptions !== 'object') imported.descriptions = {};
   backfillDocTypes(imported);
+
+  const useDocsApi = typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API;
+  const useCatalogApi = typeof USE_CATALOG_API !== 'undefined' && USE_CATALOG_API;
+
+  if (useDocsApi || useCatalogApi) {
+    try {
+      await pushImportedToApi(imported, useDocsApi, useCatalogApi);
+    } catch (err) {
+      alert(
+        'Import to server failed: ' + err.message +
+        '\n\nThe server may be in a partial state. Use Reset to Defaults to clear and try again.'
+      );
+      return false;
+    }
+    // Re-hydrate so local appData mirrors the canonical server state.
+    await hydrateCatalogFromApi();
+    renderAll();
+    closePanel();
+    return true;
+  }
+  // localStorage-only path (kept for when both API flags are off).
   appData = imported;
   saveData(appData);
   renderAll();
   closePanel();
+  return true;
+}
+
+// Replaces the user's server-side data with the import payload. Strategy is
+// destructive-replace, matching the "This replaces current content" confirm
+// shown in handleLoadJson — we delete what's there then create from scratch
+// rather than try to merge by slug.
+async function pushImportedToApi(imported, useDocsApi, useCatalogApi) {
+  if (useDocsApi) {
+    const [existingDocs, existingTypes, existingColors] = await Promise.all([
+      apiFetchDocuments(),
+      apiFetchTypes(),
+      apiFetchColors(),
+    ]);
+    // Docs reference type/color slugs as plain strings (no FK), so delete order
+    // is cosmetic. Delete docs first so a stale doc can't outlive its type.
+    await Promise.all((existingDocs || []).map(d => apiDeleteDocument(d.id)));
+    await Promise.all([
+      ...(existingTypes  || []).map(t => apiDeleteType(t.id)),
+      ...(existingColors || []).map(c => apiDeleteColor(c.id)),
+    ]);
+    // Create colors and types first so docs land in a populated palette.
+    await Promise.all([
+      ...(imported.colors || []).map(c => apiCreateColor(c)),
+      ...(imported.types  || []).map(t => apiCreateType(t)),
+    ]);
+    await Promise.all((imported.documents || []).map(d => apiCreateDocument(d)));
+  }
+  if (useCatalogApi) {
+    const catalogBody = {};
+    const kinds = [
+      'hierarchy', 'decisionFlow',
+      'form1Fields', 'form2Fields', 'form3Fields',
+      'reviewTurnbacks', 'reviewRefMeta',
+      'descriptions', 'specialChars',
+    ];
+    for (const k of kinds) {
+      if (imported[k] !== undefined) catalogBody[k] = imported[k];
+    }
+    if (Object.keys(catalogBody).length > 0) {
+      await apiPatchCatalog(catalogBody);
+    }
+  }
 }
 
 function handleReset() {
@@ -1510,6 +1343,98 @@ function handleReset() {
   appData = resetToDefaults();
   renderAll();
   closePanel();
+}
+
+// ────────────────────────── Cloud Sync toggle ──────────────────────────
+// The toggle persists in localStorage under 'fairwell_cloud_sync'. Both API
+// flag constants (USE_DOCUMENTS_API, USE_CATALOG_API) read it at script load,
+// so changing the toggle requires a page reload to take effect.
+
+function cloudSyncEnabled() {
+  return (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API)
+      || (typeof USE_CATALOG_API   !== 'undefined' && USE_CATALOG_API);
+}
+
+function countLocalItems() {
+  return (appData.documents      ? appData.documents.length      : 0)
+       + (appData.types          ? appData.types.length          : 0)
+       + (appData.colors         ? appData.colors.length         : 0)
+       + (appData.hierarchy      ? appData.hierarchy.length      : 0)
+       + (appData.decisionFlow   ? appData.decisionFlow.length   : 0)
+       + (appData.form1Fields    ? appData.form1Fields.length    : 0)
+       + (appData.form2Fields    ? appData.form2Fields.length    : 0)
+       + (appData.form3Fields    ? appData.form3Fields.length    : 0)
+       + (appData.reviewTurnbacks? appData.reviewTurnbacks.length: 0)
+       + Object.keys(appData.reviewRefMeta || {}).length;
+}
+
+async function toggleCloudSync() {
+  if (!cloudSyncEnabled()) {
+    // ── Enabling ──
+    const ok = confirm(
+      'Enable Cloud Sync?\n\n' +
+      '• Metadata (document cards, turnbacks, hierarchy, decision flow, forms, ' +
+      'reference metadata, descriptions, special chars) saves to your FAIRWELL ' +
+      'account so it follows you across devices.\n' +
+      '• PDFs and Trace results NEVER leave your browser.\n' +
+      '• Your local copy in this browser stays in sync.\n\n' +
+      'The page will reload.'
+    );
+    if (!ok) return;
+
+    // If the user has data locally, offer to push it up so they don't land on
+    // an empty server-side state after reload.
+    const n = countLocalItems();
+    if (n > 0) {
+      const upload = confirm(
+        `You have ${n} item(s) in this browser.\n\n` +
+        '[OK] Upload them to your account (recommended).\n' +
+        '[Cancel] Skip — keep server data as it is. (Your local data stays in this browser.)'
+      );
+      if (upload) {
+        try {
+          await pushImportedToApi(appData, true, true);
+        } catch (err) {
+          alert(
+            'Upload failed: ' + err.message +
+            '\n\nCloud Sync was NOT enabled. Try again, or use Reset to Defaults to clear and retry.'
+          );
+          return;
+        }
+      }
+    }
+
+    localStorage.setItem('fairwell_cloud_sync', 'true');
+    location.reload();
+  } else {
+    // ── Disabling ──
+    const ok = confirm(
+      'Disable Cloud Sync?\n\n' +
+      '• Future edits will only save in this browser.\n' +
+      '• Your data on the server is preserved and accessible if you re-enable Cloud Sync later.\n' +
+      '• Your current data is mirrored to this browser so you have continuity offline.\n\n' +
+      'The page will reload.'
+    );
+    if (!ok) return;
+    saveData(appData);  // one-shot mirror so localStorage isn't stale after reload
+    localStorage.setItem('fairwell_cloud_sync', 'false');
+    location.reload();
+  }
+}
+
+function updateCloudSyncDisplay() {
+  const status = document.getElementById('cloudSyncStatus');
+  const banner = document.getElementById('cloudSyncBanner');
+  const enabled = cloudSyncEnabled();
+  if (status) status.textContent = enabled ? 'On' : 'Off';
+  const btn = document.getElementById('cloudSyncToggle');
+  if (btn) btn.classList.toggle('cloud-sync-on', enabled);
+  if (banner) {
+    banner.textContent = enabled
+      ? 'Cloud Sync ON · syncing metadata to your account · PDFs never leave your browser'
+      : 'Cloud Sync OFF · all data stays in this browser';
+    banner.classList.toggle('cloud-sync-banner-on', enabled);
+  }
 }
 
 // ────────────────────────── Theme Toggle ──────────────────────────
@@ -1602,7 +1527,7 @@ function renderAll() {
   renderLegend();
   renderSpecialChars();
   renderSectionDescriptions();
-  renderDocGrid();
+  migrateDocumentsToHierarchy();
   renderHierarchy();
   renderDecisionFlow();
   renderAllForms();
@@ -1888,6 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAboutPopover();
   initDocViewer();
   installFileDropGuard();
+  updateCloudSyncDisplay();
   if (typeof USE_DOCUMENTS_API !== 'undefined' && USE_DOCUMENTS_API) {
     hydrateCatalogFromApi();
   }

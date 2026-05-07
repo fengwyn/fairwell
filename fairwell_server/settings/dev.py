@@ -1,3 +1,4 @@
+# gunicorn
 """Development settings: DEBUG on, SQLite, permissive hosts."""
 
 from decouple import config
@@ -15,6 +16,13 @@ CORS_ALLOW_ALL_ORIGINS = True
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
 WHITENOISE_MAX_AGE = 0
+
+# Belt-and-suspenders: explicit no-store on every /static/ response. Django's
+# runserver static handler bypasses WhiteNoise; this middleware re-asserts the
+# header regardless of which path served the file.
+MIDDLEWARE = list(MIDDLEWARE) + [
+    'fairwell_server.middleware.NoCacheStaticMiddleware',
+]
 
 # Set DEV_DB_PATH in .env to point at an external SSD; on the gentoo Pi this
 # avoids hammering the boot SD card with SQLite writes.
