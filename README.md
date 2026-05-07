@@ -23,12 +23,13 @@ All content is data-driven — the app ships with a vanilla/empty default so you
 
 That's it.
 
-## The Four Sections
+## Sections
 
-- **Document Map** — cards for each governing document, with cross-references and links. Add, edit, or remove documents from the UI.
-- **Hierarchy** — visual tree showing how documents relate, from enterprise foundation down to the operational forms.
+- **Hierarchy** — visual top-down tree of every governing document, from enterprise foundation down to the operational forms. Click any card to expand its role, description, and cross-references inline; cards are color-coded by Type (managed via the **Manage Types** button in the section header). Add cards to existing levels, branch a level into siblings, or append a new level. This section absorbs the role of the old Document Map: the cross-reference list lives on each card alongside the rest of its metadata.
 - **Decision Flow** — a step-by-step guide for deciding which document to consult given a specific question during a FAIR review.
 - **Interactive Forms** — the three AS9102 form layouts. Click any field to see which documents govern it, what inspectors should verify, and the turnback codes tied to it.
+- **Generate Turnbacks** — the Findings Composer. Browse a curated library of turnback templates, fill in placeholder specifics, stack findings into a basket, and export a tab-separated block ready to paste into the Findings template. Filter the library by document, severity, or program; manage shared reference metadata via **Manage References**.
+- **Trace** — drop in FAIR packet PDFs (Form 1/2/3, PO, CoC, drawings, raw-material certs) and trace any part number, serial, heat/lot, or spec across all of them. Files never leave your browser — parsing happens client-side via PDF.js. Run on-device OCR (Tesseract.js) on scanned PDFs *or* on text-layer PDFs whose text layer is incomplete; OCR'd hits surface a confidence pill on each match and a distinct purple edge in the link graph. Organize files into colored **Groups** to scope a trace to one FAIR packet at a time — drop files while a group is selected and they're auto-assigned to it.
 
 ## Top Toolbar
 
